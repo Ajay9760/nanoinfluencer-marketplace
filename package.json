@@ -81,5 +81,8 @@
   "bugs": {
     "url": "https://github.com/your-org/nanoinfluencer-marketplace/issues"
   },
-  "homepage": "https://github.com/your-org/nanoinfluencer-marketplace#readme"
+  "homepage": "https://github.com/your-org/nanoinfluencer-marketplace#readme",
+  "dependencies": {
+    "ajv": "^8.17.1"
+  }
 }

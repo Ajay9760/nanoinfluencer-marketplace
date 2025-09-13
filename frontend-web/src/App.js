@@ -3,6 +3,7 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 
 import Layout from './components/Layout';
+import PrivateRoute from './components/PrivateRoute';
 import HomePage from './pages/HomePage';
 import AuthPage from './pages/AuthPage';
 import DashboardPage from './pages/DashboardPage';
@@ -12,13 +13,12 @@ import AnalyticsPage from './pages/AnalyticsPage';
 import ProfilePage from './pages/ProfilePage';
 import NotFoundPage from './pages/NotFoundPage';
 
-// Import context providers when implemented
-// import { AuthProvider } from './contexts/AuthContext';
-// import { ThemeProvider } from './contexts/ThemeContext';
+// Import context providers
+import { AuthProvider } from './contexts/AuthContext';
 
 function App() {
   return (
-    <>
+    <AuthProvider>
       <Helmet>
         <title>NanoInfluencer MarketPlace</title>
         <meta name="description" content="Connect brands with nano-influencers for authentic marketing campaigns" />
@@ -44,8 +44,12 @@ function App() {
           <Route path="/" element={<HomePage />} />
           <Route path="/auth" element={<AuthPage />} />
           
-          {/* Protected routes wrapped in Layout */}
-          <Route path="/app" element={<Layout />}>
+          {/* Protected routes wrapped in Layout and PrivateRoute */}
+          <Route path="/app" element={
+            <PrivateRoute>
+              <Layout />
+            </PrivateRoute>
+          }>
             <Route index element={<DashboardPage />} />
             <Route path="dashboard" element={<DashboardPage />} />
             <Route path="campaigns" element={<CampaignsPage />} />
@@ -61,7 +65,7 @@ function App() {
           <Route path="*" element={<NotFoundPage />} />
         </Routes>
       </div>
-    </>
+    </AuthProvider>
   );
 }
 

@@ -1,0 +1,80 @@
+services:
+  # Development PostgreSQL
+  postgres-dev:
+    image: postgres:15-alpine
+    container_name: nano-postgres-dev
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: nanoinfluencer_dev
+      POSTGRES_USER: nanoinfluencer_user
+      POSTGRES_PASSWORD: dev_password_123
+    volumes:
+      - postgres_dev_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - nano-dev-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nanoinfluencer_user -d nanoinfluencer_dev"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis Cache for Development
+  redis-dev:
+    image: redis:7-alpine
+    container_name: nano-redis-dev
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_dev_data:/data
+    ports:
+      - "6379:6379"
+    networks:
+      - nano-dev-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  # pgAdmin for Database Management
+  pgadmin-dev:
+    image: dpage/pgadmin4:latest
+    container_name: nano-pgadmin-dev
+    restart: unless-stopped
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@nanoinfluencer.dev
+      PGADMIN_DEFAULT_PASSWORD: admin123
+      PGADMIN_CONFIG_SERVER_MODE: 'False'
+    ports:
+      - "8080:80"
+    volumes:
+      - pgadmin_dev_data:/var/lib/pgadmin
+    depends_on:
+      postgres-dev:
+        condition: service_healthy
+    networks:
+      - nano-dev-network
+
+  # MailHog for email testing in development
+  mailhog-dev:
+    image: mailhog/mailhog:latest
+    container_name: nano-mailhog-dev
+    restart: unless-stopped
+    ports:
+      - "1025:1025"  # SMTP
+      - "8025:8025"  # Web UI
+    networks:
+      - nano-dev-network
+
+# Volumes
+volumes:
+  postgres_dev_data:
+  redis_dev_data:
+  pgadmin_dev_data:
+
+# Networks
+networks:
+  nano-dev-network:
+    driver: bridge

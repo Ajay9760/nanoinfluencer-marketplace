@@ -1,0 +1,616 @@
+name: 🚀 CI/CD Pipeline - NanoInfluencer Marketplace
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Deployment Environment'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+        - staging
+        - production
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: nanoinfluencer-marketplace
+
+jobs:
+  # Security and Code Quality Analysis
+  security-analysis:
+    name: 🔒 Security Analysis
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: javascript
+          queries: security-extended,security-and-quality
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+
+      - name: Run Semgrep
+        uses: semgrep/semgrep-action@v1
+        with:
+          publishToken: ${{ secrets.SEMGREP_APP_TOKEN }}
+
+      - name: Run Snyk Security Scan
+        uses: snyk/actions/node@master
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        with:
+          args: --severity-threshold=high --file=backend/package.json
+
+      - name: Upload Snyk results to GitHub Code Scanning
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: snyk.sarif
+
+  # Dependency Check and License Compliance
+  dependency-check:
+    name: 📦 Dependency Security
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install dependencies
+        run: |
+          cd backend
+          npm ci
+
+      - name: Audit dependencies
+        run: |
+          cd backend
+          npm audit --audit-level=moderate
+
+      - name: Check licenses
+        run: |
+          cd backend
+          npx license-checker --onlyAllow 'MIT;BSD;Apache;ISC;BSD-2-Clause;BSD-3-Clause'
+
+      - name: Dependency vulnerability scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: 'backend'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+
+      - name: Upload Trivy scan results to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: 'trivy-results.sarif'
+
+  # Backend Testing
+  backend-test:
+    name: 🧪 Backend Tests
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_PASSWORD: test_password
+          POSTGRES_DB: nanoinfluencer_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 3s
+          --health-retries 5
+        ports:
+          - 6379:6379
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install dependencies
+        run: |
+          cd backend
+          npm ci
+
+      - name: Run linting
+        run: |
+          cd backend
+          npm run lint
+
+      - name: Run unit tests
+        env:
+          NODE_ENV: test
+          DB_HOST: localhost
+          DB_PORT: 5432
+          DB_NAME: nanoinfluencer_test
+          DB_USER: postgres
+          DB_PASSWORD: test_password
+          REDIS_URL: redis://localhost:6379
+          JWT_SECRET: test-secret
+          JWT_REFRESH_SECRET: test-refresh-secret
+        run: |
+          cd backend
+          npm run test:coverage
+
+      - name: Upload test coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          file: ./backend/coverage/lcov.info
+          flags: backend
+          name: backend-coverage
+
+  # Frontend Testing
+  frontend-test:
+    name: 🎨 Frontend Tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend-web
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: frontend-web/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run linting
+        run: npm run lint
+
+      - name: Run unit tests
+        run: npm run test:coverage
+
+      - name: Build frontend
+        run: npm run build
+
+      - name: Upload test coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          file: ./frontend-web/coverage/lcov.info
+          flags: frontend
+          name: frontend-coverage
+
+  # Integration and E2E Testing
+  e2e-test:
+    name: 🌐 E2E Tests
+    runs-on: ubuntu-latest
+    needs: [backend-test, frontend-test]
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_PASSWORD: test_password
+          POSTGRES_DB: nanoinfluencer_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 3s
+          --health-retries 5
+        ports:
+          - 6379:6379
+      mailhog:
+        image: mailhog/mailhog:latest
+        ports:
+          - 1025:1025
+          - 8025:8025
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install backend dependencies
+        run: |
+          cd backend
+          npm ci
+
+      - name: Install frontend dependencies
+        run: |
+          cd frontend-web
+          npm ci
+
+      - name: Start backend server
+        env:
+          NODE_ENV: test
+          DB_HOST: localhost
+          DB_PORT: 5432
+          DB_NAME: nanoinfluencer_test
+          DB_USER: postgres
+          DB_PASSWORD: test_password
+          REDIS_URL: redis://localhost:6379
+          JWT_SECRET: test-secret
+          SMTP_HOST: localhost
+          SMTP_PORT: 1025
+        run: |
+          cd backend
+          npm start &
+          npx wait-on http://localhost:3001/api/health --timeout 60000
+
+      - name: Build and start frontend
+        env:
+          REACT_APP_API_URL: http://localhost:3001/api
+        run: |
+          cd frontend-web
+          npm run build
+          npx serve -s build -p 3000 &
+          npx wait-on http://localhost:3000 --timeout 60000
+
+      - name: Install Playwright
+        run: npx playwright install --with-deps
+
+      - name: Run E2E tests
+        run: npx playwright test
+
+      - name: Upload E2E test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: e2e-test-results
+          path: test-results/
+
+  # Build and Push Docker Images
+  build-images:
+    name: 🐳 Build Docker Images
+    runs-on: ubuntu-latest
+    needs: [security-analysis, dependency-check, backend-test, frontend-test]
+    if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
+    outputs:
+      backend-image: ${{ steps.meta-backend.outputs.tags }}
+      frontend-image: ${{ steps.meta-frontend.outputs.tags }}
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Backend Image
+      - name: Extract backend metadata
+        id: meta-backend
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ github.repository }}/backend
+          tags: |
+            type=ref,event=branch
+            type=sha,prefix=commit-
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push backend image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./backend
+          push: true
+          tags: ${{ steps.meta-backend.outputs.tags }}
+          labels: ${{ steps.meta-backend.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          platforms: linux/amd64,linux/arm64
+
+      # Frontend Image
+      - name: Extract frontend metadata
+        id: meta-frontend
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ github.repository }}/frontend
+          tags: |
+            type=ref,event=branch
+            type=sha,prefix=commit-
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push frontend image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./frontend-web
+          push: true
+          tags: ${{ steps.meta-frontend.outputs.tags }}
+          labels: ${{ steps.meta-frontend.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          platforms: linux/amd64,linux/arm64
+
+      # Container Security Scanning
+      - name: Scan backend image for vulnerabilities
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ steps.meta-backend.outputs.tags }}
+          format: 'sarif'
+          output: 'backend-trivy-results.sarif'
+
+      - name: Upload backend image scan results
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: 'backend-trivy-results.sarif'
+          category: 'backend-container'
+
+  # Deploy to Staging
+  deploy-staging:
+    name: 🚀 Deploy to Staging
+    runs-on: ubuntu-latest
+    needs: [build-images, e2e-test]
+    if: github.ref == 'refs/heads/main' || (github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'staging')
+    environment:
+      name: staging
+      url: https://staging.nanoinfluencer.com
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup SSH
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.STAGING_SSH_KEY }}
+
+      - name: Deploy to staging server
+        run: |
+          ssh -o StrictHostKeyChecking=no ${{ secrets.STAGING_USER }}@${{ secrets.STAGING_HOST }} << 'EOF'
+            cd /opt/nanoinfluencer-marketplace
+            
+            # Pull latest code
+            git pull origin main
+            
+            # Update environment variables
+            echo "DB_PASSWORD=${{ secrets.STAGING_DB_PASSWORD }}" > .env.staging
+            echo "JWT_SECRET=${{ secrets.STAGING_JWT_SECRET }}" >> .env.staging
+            echo "JWT_REFRESH_SECRET=${{ secrets.STAGING_JWT_REFRESH_SECRET }}" >> .env.staging
+            echo "REDIS_PASSWORD=${{ secrets.STAGING_REDIS_PASSWORD }}" >> .env.staging
+            echo "SENTRY_DSN=${{ secrets.SENTRY_DSN }}" >> .env.staging
+            
+            # Deploy with Docker Compose
+            docker-compose -f docker-compose.prod.yml --env-file .env.staging down
+            docker-compose -f docker-compose.prod.yml --env-file .env.staging pull
+            docker-compose -f docker-compose.prod.yml --env-file .env.staging up -d
+            
+            # Run database migrations
+            docker-compose -f docker-compose.prod.yml exec -T backend1 npm run migrate
+            
+            # Health check
+            timeout 120 bash -c 'until curl -f http://localhost/api/health; do sleep 5; done'
+            echo "✅ Staging deployment completed successfully!"
+          EOF
+
+      - name: Run smoke tests on staging
+        run: |
+          curl -f https://staging.nanoinfluencer.com/api/health
+          curl -f https://staging.nanoinfluencer.com/
+
+      - name: Notify deployment status
+        uses: 8398a7/action-slack@v3
+        with:
+          status: custom
+          custom_payload: |
+            {
+              "text": "🚀 Staging deployment completed successfully!",
+              "attachments": [
+                {
+                  "color": "good",
+                  "fields": [
+                    { "title": "Environment", "value": "Staging", "short": true },
+                    { "title": "Branch", "value": "${{ github.ref_name }}", "short": true },
+                    { "title": "Commit", "value": "${{ github.sha }}", "short": true },
+                    { "title": "URL", "value": "https://staging.nanoinfluencer.com", "short": false }
+                  ]
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+  # Deploy to Production
+  deploy-production:
+    name: 🌟 Deploy to Production
+    runs-on: ubuntu-latest
+    needs: [build-images, deploy-staging]
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'production'))
+    environment:
+      name: production
+      url: https://nanoinfluencer.com
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup SSH
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.PRODUCTION_SSH_KEY }}
+
+      - name: Create database backup
+        run: |
+          ssh -o StrictHostKeyChecking=no ${{ secrets.PRODUCTION_USER }}@${{ secrets.PRODUCTION_HOST }} << 'EOF'
+            cd /opt/nanoinfluencer-marketplace
+            docker-compose -f docker-compose.prod.yml exec -T postgres pg_dump -U ${{ secrets.PRODUCTION_DB_USER }} -d nanoinfluencer > backup_$(date +%Y%m%d_%H%M%S).sql
+            echo "✅ Database backup created"
+          EOF
+
+      - name: Deploy to production server
+        run: |
+          ssh -o StrictHostKeyChecking=no ${{ secrets.PRODUCTION_USER }}@${{ secrets.PRODUCTION_HOST }} << 'EOF'
+            cd /opt/nanoinfluencer-marketplace
+            
+            # Pull latest code
+            git pull origin main
+            
+            # Update environment variables
+            echo "DB_PASSWORD=${{ secrets.PRODUCTION_DB_PASSWORD }}" > .env.production
+            echo "JWT_SECRET=${{ secrets.PRODUCTION_JWT_SECRET }}" >> .env.production
+            echo "JWT_REFRESH_SECRET=${{ secrets.PRODUCTION_JWT_REFRESH_SECRET }}" >> .env.production
+            echo "REDIS_PASSWORD=${{ secrets.PRODUCTION_REDIS_PASSWORD }}" >> .env.production
+            echo "SENTRY_DSN=${{ secrets.SENTRY_DSN }}" >> .env.production
+            echo "STRIPE_SECRET_KEY=${{ secrets.STRIPE_SECRET_KEY }}" >> .env.production
+            echo "STRIPE_WEBHOOK_SECRET=${{ secrets.STRIPE_WEBHOOK_SECRET }}" >> .env.production
+            
+            # Rolling deployment
+            docker-compose -f docker-compose.prod.yml --env-file .env.production pull
+            
+            # Update backend instances one by one
+            docker-compose -f docker-compose.prod.yml --env-file .env.production up -d --no-deps backend1
+            sleep 30
+            docker-compose -f docker-compose.prod.yml --env-file .env.production up -d --no-deps backend2
+            sleep 30
+            docker-compose -f docker-compose.prod.yml --env-file .env.production up -d --no-deps backend3
+            sleep 30
+            
+            # Update other services
+            docker-compose -f docker-compose.prod.yml --env-file .env.production up -d --no-deps frontend nginx
+            
+            # Run database migrations
+            docker-compose -f docker-compose.prod.yml exec -T backend1 npm run migrate
+            
+            # Health check
+            timeout 120 bash -c 'until curl -f https://nanoinfluencer.com/api/health; do sleep 5; done'
+            echo "✅ Production deployment completed successfully!"
+          EOF
+
+      - name: Run production smoke tests
+        run: |
+          curl -f https://nanoinfluencer.com/api/health
+          curl -f https://nanoinfluencer.com/
+          curl -f https://nanoinfluencer.com/metrics
+
+      - name: Create GitHub release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: v${{ github.run_number }}
+          release_name: Release v${{ github.run_number }}
+          body: |
+            ## 🚀 Production Deployment v${{ github.run_number }}
+            
+            ### Changes
+            ${{ github.event.head_commit.message }}
+            
+            ### Commit
+            ${{ github.sha }}
+            
+            ### Services Deployed
+            - ✅ Load-balanced backend (3 instances)
+            - ✅ React frontend with Nginx
+            - ✅ PostgreSQL database with migrations
+            - ✅ Redis caching
+            - ✅ Monitoring with Prometheus & Grafana
+            
+            ### Features
+            - 🔐 2FA Authentication
+            - 📧 Email Verification
+            - 💳 Stripe Payment Processing
+            - 📱 Social Media API Integration
+            - ⚖️ Load Balancing with Health Checks
+          draft: false
+          prerelease: false
+
+      - name: Notify production deployment
+        uses: 8398a7/action-slack@v3
+        with:
+          status: custom
+          custom_payload: |
+            {
+              "text": "🌟 Production deployment completed successfully!",
+              "attachments": [
+                {
+                  "color": "good",
+                  "fields": [
+                    { "title": "Environment", "value": "Production", "short": true },
+                    { "title": "Version", "value": "v${{ github.run_number }}", "short": true },
+                    { "title": "Branch", "value": "${{ github.ref_name }}", "short": true },
+                    { "title": "URL", "value": "https://nanoinfluencer.com", "short": false }
+                  ]
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+  # Post-deployment monitoring
+  post-deployment-monitoring:
+    name: 📊 Post-Deployment Monitoring
+    runs-on: ubuntu-latest
+    needs: [deploy-production]
+    if: always() && contains(needs.*.result, 'success')
+    steps:
+      - name: Monitor deployment health
+        run: |
+          echo "🔍 Monitoring deployment health for 5 minutes..."
+          for i in {1..60}; do
+            if curl -f https://nanoinfluencer.com/api/health > /dev/null 2>&1; then
+              echo "✅ Health check $i/60 passed"
+            else
+              echo "❌ Health check $i/60 failed"
+              exit 1
+            fi
+            sleep 5
+          done
+          echo "✅ All health checks passed!"
+
+      - name: Performance test
+        run: |
+          npx lighthouse https://nanoinfluencer.com --output=json --output-path=lighthouse-report.json
+          echo "📊 Lighthouse performance report generated"
+
+      - name: Upload lighthouse report
+        uses: actions/upload-artifact@v4
+        with:
+          name: lighthouse-report
+          path: lighthouse-report.json
