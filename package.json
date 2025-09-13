@@ -1,0 +1,85 @@
+{
+  "name": "nanoinfluencer-marketplace",
+  "version": "1.0.0",
+  "description": "A two-sided marketplace connecting brands to nano-influencers with higher engagement rates and authenticity",
+  "private": true,
+  "workspaces": [
+    "backend",
+    "frontend-web",
+    "frontend-mobile"
+  ],
+  "scripts": {
+    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:web\" \"npm run dev:ai\"",
+    "dev:backend": "cd backend && npm run dev",
+    "dev:web": "cd frontend-web && npm start",
+    "dev:mobile": "cd frontend-mobile && npm start",
+    "dev:ai": "cd ai-services && python -m uvicorn main:app --reload",
+    "build": "npm run build:backend && npm run build:web",
+    "build:backend": "cd backend && npm run build",
+    "build:web": "cd frontend-web && npm run build",
+    "test": "npm run test:backend && npm run test:web",
+    "test:backend": "cd backend && npm test",
+    "test:web": "cd frontend-web && npm test",
+    "test:ai": "cd ai-services && python -m pytest",
+    "lint": "npm run lint:backend && npm run lint:web",
+    "lint:backend": "cd backend && npm run lint",
+    "lint:web": "cd frontend-web && npm run lint",
+    "db:setup": "cd backend && npm run db:setup",
+    "db:migrate": "cd backend && npm run db:migrate",
+    "db:seed": "cd backend && npm run db:seed",
+    "docker:up": "docker-compose up -d",
+    "docker:down": "docker-compose down",
+    "docker:build": "docker-compose build",
+    "deploy:staging": "npm run build && npm run deploy:backend:staging && npm run deploy:web:staging",
+    "deploy:production": "npm run build && npm run deploy:backend:production && npm run deploy:web:production",
+    "deploy:backend:staging": "cd backend && npm run deploy:staging",
+    "deploy:backend:production": "cd backend && npm run deploy:production",
+    "deploy:web:staging": "cd frontend-web && npm run deploy:staging",
+    "deploy:web:production": "cd frontend-web && npm run deploy:production"
+  },
+  "keywords": [
+    "marketplace",
+    "influencer",
+    "nano-influencer",
+    "brands",
+    "social-media",
+    "marketing",
+    "campaigns",
+    "analytics",
+    "ai",
+    "machine-learning"
+  ],
+  "author": "NanoInfluencer Team",
+  "license": "MIT",
+  "devDependencies": {
+    "concurrently": "^8.2.2",
+    "husky": "^8.0.3",
+    "lint-staged": "^15.2.0"
+  },
+  "husky": {
+    "hooks": {
+      "pre-commit": "lint-staged"
+    }
+  },
+  "lint-staged": {
+    "*.{js,jsx,ts,tsx}": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "*.{json,md,yml,yaml}": [
+      "prettier --write"
+    ]
+  },
+  "engines": {
+    "node": ">=16.0.0",
+    "npm": ">=8.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/your-org/nanoinfluencer-marketplace.git"
+  },
+  "bugs": {
+    "url": "https://github.com/your-org/nanoinfluencer-marketplace/issues"
+  },
+  "homepage": "https://github.com/your-org/nanoinfluencer-marketplace#readme"
+}
