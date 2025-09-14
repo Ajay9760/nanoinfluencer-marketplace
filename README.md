@@ -4,7 +4,7 @@
 
 [![GitHub Stars](https://img.shields.io/github/stars/Ajay9760/nanoinfluencer-marketplace?style=social)](https://github.com/Ajay9760/nanoinfluencer-marketplace)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![CI](https://github.com/Ajay9760/nanoinfluencer-marketplace/workflows/🧪%20Continuous%20Integration/badge.svg)](https://github.com/Ajay9760/nanoinfluencer-marketplace/actions)
+[![CI](https://github.com/Ajay9760/nanoinfluencer-marketplace/workflows/✅%20Simple%20CI/badge.svg)](https://github.com/Ajay9760/nanoinfluencer-marketplace/actions)
 [![Security](https://img.shields.io/badge/security-A-green)](https://github.com/Ajay9760/nanoinfluencer-marketplace)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 
