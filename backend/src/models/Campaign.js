@@ -188,16 +188,12 @@ Campaign.associate = (models) => {
   });
   
   // Campaign has many Applications
-  // Campaign.hasMany(models.CampaignApplication, {
-  //   foreignKey: 'campaignId',
-  //   as: 'applications'
-  // });
-  
-  // Campaign has many Deliverables
-  // Campaign.hasMany(models.CampaignDeliverable, {
-  //   foreignKey: 'campaignId',
-  //   as: 'deliverables'
-  // });
+  if (models.CampaignApplication) {
+    Campaign.hasMany(models.CampaignApplication, {
+      foreignKey: 'campaignId',
+      as: 'applications'
+    });
+  }
 };
 
 // Hooks

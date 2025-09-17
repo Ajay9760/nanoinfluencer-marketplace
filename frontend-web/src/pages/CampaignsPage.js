@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   PlusIcon, 
   MagnifyingGlassIcon, 
@@ -29,11 +29,7 @@ const CampaignsPage = () => {
     pages: 0
   });
 
-  useEffect(() => {
-    fetchCampaigns();
-  }, [pagination.page, searchTerm, statusFilter]);
-
-  const fetchCampaigns = async () => {
+  const fetchCampaigns = useCallback(async () => {
     setLoading(true);
     try {
       const params = {
@@ -51,7 +47,11 @@ const CampaignsPage = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [pagination.page, pagination.limit, searchTerm, statusFilter]);
+
+  useEffect(() => {
+    fetchCampaigns();
+  }, [fetchCampaigns]);
 
   const handleCampaignCreated = (newCampaign) => {
     setCampaigns(prev => [newCampaign, ...prev]);

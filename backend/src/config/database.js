@@ -12,7 +12,7 @@ const config = {
     username: process.env.DB_USER || 'postgres',
     password: process.env.DB_PASSWORD || 'password',
     // SQLite fallback configuration
-    storage: process.env.DB_DIALECT === 'sqlite' ? ':memory:' : undefined,
+    storage: process.env.DB_DIALECT === 'sqlite' ? './database.sqlite' : undefined,
     pool: {
       max: 10,
       min: 0,

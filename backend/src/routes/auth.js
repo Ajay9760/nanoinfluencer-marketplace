@@ -52,4 +52,11 @@ router.put('/profile', authenticate, validateProfileUpdate, authController.updat
  */
 router.put('/change-password', authenticate, validatePasswordChange, authController.changePassword);
 
+/**
+ * @route   POST /api/auth/google
+ * @desc    Google OAuth login/registration
+ * @access  Public
+ */
+router.post('/google', authController.googleLogin);
+
 module.exports = router;

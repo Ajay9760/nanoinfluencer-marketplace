@@ -14,6 +14,9 @@ const { logger, metricsMiddleware, healthCheck, errorHandler: monitoringErrorHan
 const { testConnection, sequelize } = require('./config/database');
 const User = require('./models/User');
 const Campaign = require('./models/Campaign');
+const SocialMediaAccount = require('./models/SocialMediaAccount');
+const CampaignApplication = require('./models/CampaignApplication');
+const Analytics = require('./models/Analytics');
 
 // Initialize Sentry first (before other imports)
 initSentry();
@@ -107,11 +110,13 @@ app.get('/metrics', async (req, res) => {
 // API routes with specific rate limiting
 app.use('/api/auth', authLimiter, require('./routes/auth'));
 app.use('/api/campaigns', require('./routes/campaigns'));
+app.use('/api/applications', require('./routes/applications'));
+app.use('/api/social-media', require('./routes/socialMedia'));
+app.use('/api/analytics', require('./routes/analytics'));
 // Additional routes will be added here
 // app.use('/api/influencers', require('./routes/influencers'));
 // app.use('/api/brands', require('./routes/brands'));
 // app.use('/api/payments', require('./routes/payments'));
-// app.use('/api/analytics', require('./routes/analytics'));
 
 // 404 handler
 app.use('*', (req, res) => {
@@ -145,7 +150,13 @@ const startServer = async () => {
     logger.info('Database connection established successfully');
     
     // Set up model associations
-    const models = { User, Campaign };
+    const models = { 
+      User, 
+      Campaign, 
+      SocialMediaAccount, 
+      CampaignApplication, 
+      Analytics 
+    };
     Object.keys(models).forEach(modelName => {
       if (models[modelName].associate) {
         models[modelName].associate(models);
@@ -154,7 +165,8 @@ const startServer = async () => {
     logger.info('Model associations configured');
     
     // Sync database models (create tables if they don't exist)
-    await sequelize.sync({ alter: true });
+    // Use force: true to recreate tables with new schema during development
+    await sequelize.sync({ force: process.env.NODE_ENV !== 'production', alter: process.env.NODE_ENV === 'production' });
     logger.info('Database models synchronized successfully');
     
     // Start server

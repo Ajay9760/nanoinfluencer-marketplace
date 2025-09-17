@@ -6,8 +6,8 @@ import {
   CurrencyDollarIcon,
   ArrowUpIcon,
   ArrowDownIcon,
-  EyeIcon,
-  PlayIcon
+  // EyeIcon,  // unused
+  // PlayIcon  // unused
 } from '@heroicons/react/24/outline';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -43,24 +43,101 @@ const AnimatedCounter = ({ value, duration = 2000 }) => {
 const DashboardPage = () => {
   const { user } = useAuth();
   const [loading, setLoading] = useState(true);
-  const [stats, setStats] = useState([
-    { name: 'Total Campaigns', value: '12', icon: MegaphoneIcon, change: '+4.75%', changeType: 'positive' },
-    { name: 'Active Influencers', value: '89', icon: UserGroupIcon, change: '+54.02%', changeType: 'positive' },
-    { name: 'Total Revenue', value: '$24,780', icon: CurrencyDollarIcon, change: '+12.09%', changeType: 'positive' },
-    { name: 'Avg. Engagement', value: '8.2%', icon: ChartBarIcon, change: '+2.1%', changeType: 'positive' },
-  ]);
+  const [stats, setStats] = useState([]);
   
   useEffect(() => {
-    // Simulate loading data
-    const timer = setTimeout(() => {
-      setLoading(false);
-    }, 1000);
+    const fetchDashboardData = async () => {
+      try {
+        setLoading(true);
+        
+        // Import the analytics API
+        const { analyticsAPI } = await import('../services/api');
+        const response = await analyticsAPI.getDashboardStats();
+        const data = response.stats;
+        
+        // Transform data for stats display based on user role
+        let statsArray = [];
+        
+        if (user?.role === 'brand') {
+          statsArray = [
+            { 
+              name: 'Total Campaigns', 
+              value: data.totalCampaigns || 0, 
+              icon: MegaphoneIcon, 
+              change: '+0%', 
+              changeType: 'neutral' 
+            },
+            { 
+              name: 'Active Campaigns', 
+              value: data.activeCampaigns || 0, 
+              icon: UserGroupIcon, 
+              change: '+0%', 
+              changeType: 'neutral' 
+            },
+            { 
+              name: 'Total Budget', 
+              value: `$${data.totalBudget || 0}`, 
+              icon: CurrencyDollarIcon, 
+              change: '+0%', 
+              changeType: 'neutral' 
+            },
+            { 
+              name: 'Approved Influencers', 
+              value: data.approvedInfluencers || 0, 
+              icon: ChartBarIcon, 
+              change: '+0%', 
+              changeType: 'neutral' 
+            },
+          ];
+        } else if (user?.role === 'influencer') {
+          statsArray = [
+            { 
+              name: 'Total Followers', 
+              value: data.totalFollowers?.toLocaleString() || '0', 
+              icon: UserGroupIcon, 
+              change: '+0%', 
+              changeType: 'neutral' 
+            },
+            { 
+              name: 'Applications', 
+              value: data.totalApplications || 0, 
+              icon: MegaphoneIcon, 
+              change: '+0%', 
+              changeType: 'neutral' 
+            },
+            { 
+              name: 'Potential Earnings', 
+              value: `$${data.potentialEarnings || 0}`, 
+              icon: CurrencyDollarIcon, 
+              change: '+0%', 
+              changeType: 'neutral' 
+            },
+            { 
+              name: 'Engagement Rate', 
+              value: `${data.averageEngagementRate || 0}%`, 
+              icon: ChartBarIcon, 
+              change: '+0%', 
+              changeType: 'neutral' 
+            },
+          ];
+        }
+        
+        setStats(statsArray);
+        
+      } catch (error) {
+        // eslint-disable-next-line no-console
+        console.error('Failed to fetch dashboard data:', error);
+        // Set default stats on error
+        setStats([
+          { name: 'Welcome!', value: '0', icon: MegaphoneIcon, change: '+0%', changeType: 'neutral' },
+        ]);
+      } finally {
+        setLoading(false);
+      }
+    };
     
-    // Here is where you would fetch real data from the API
-    // Example: analyticsAPI.getDashboardStats().then(data => setStats(data.stats));
-    
-    return () => clearTimeout(timer);
-  }, []);
+    fetchDashboardData();
+  }, [user]);
   if (loading) {
     return (
       <div className="space-y-6">

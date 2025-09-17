@@ -28,11 +28,15 @@ const register = async (req, res) => {
       });
     }
 
+    // Hash password manually
+    const bcrypt = require('bcryptjs');
+    const hashedPassword = await bcrypt.hash(password, 12);
+    
     // Create new user
     const user = await User.create({
       name,
       email,
-      password, // Will be hashed by the model hook
+      passwordHash: hashedPassword,
       role,
       status: 'active' // Auto-activate for demo purposes
     });
@@ -268,11 +272,87 @@ const changePassword = async (req, res) => {
   }
 };
 
+/**
+ * Google OAuth login/registration
+ */
+const googleLogin = async (req, res) => {
+  try {
+    const { credential, role = 'influencer' } = req.body;
+
+    // TODO: Implement real Google OAuth verification
+    // const { OAuth2Client } = require('google-auth-library');
+    // const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+    // const ticket = await client.verifyIdToken({
+    //   idToken: credential,
+    //   audience: process.env.GOOGLE_CLIENT_ID,
+    // });
+    // const googleUser = ticket.getPayload();
+    
+    // For now, return error until proper Google OAuth is configured
+    return res.status(501).json({
+      error: 'Google OAuth not configured',
+      message: 'Google authentication requires proper OAuth setup'
+    });
+
+    // Check if user already exists
+    const { Op } = require('sequelize');
+    let user = await User.findOne({ 
+      where: { 
+        [Op.or]: [
+          { email: mockGoogleUser.email },
+          { googleId: mockGoogleUser.googleId }
+        ]
+      } 
+    });
+
+    if (!user) {
+      // Create new user
+      user = await User.create({
+        name: mockGoogleUser.name,
+        email: mockGoogleUser.email,
+        googleId: mockGoogleUser.googleId,
+        profilePicture: mockGoogleUser.picture,
+        role,
+        status: 'active',
+        authProvider: 'google'
+      });
+    }
+
+    // Check if account is active
+    if (user.status !== 'active') {
+      return res.status(403).json({
+        error: 'Account access denied',
+        message: 'Your account is not active. Please contact support.'
+      });
+    }
+
+    // Generate JWT tokens
+    const tokens = generateTokenPair(user);
+
+    // Update last login
+    await user.update({ lastLoginAt: new Date() });
+
+    res.json({
+      message: 'Google login successful',
+      user: user.toJSON(),
+      ...tokens
+    });
+
+  } catch (error) {
+    console.error('Google login error:', error);
+    res.status(500).json({
+      error: 'Google login failed',
+      message: 'Internal server error'
+    });
+  }
+};
+
 module.exports = {
   register,
   login,
   refreshToken,
   getProfile,
   updateProfile,
-  changePassword
+  changePassword,
+  googleLogin
 };

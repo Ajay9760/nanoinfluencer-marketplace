@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
 import { XMarkIcon } from '@heroicons/react/24/outline';
-import { useAuth } from '../../contexts/AuthContext';
+// import { useAuth } from '../../contexts/AuthContext'; // Commented out as unused
 import { campaignsAPI } from '../../services/api';
 import toast from 'react-hot-toast';
 
 const CreateCampaignModal = ({ isOpen, onClose, onCampaignCreated }) => {
-  const { user } = useAuth();
+  // const { user } = useAuth(); // Commented out as unused
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     title: '',

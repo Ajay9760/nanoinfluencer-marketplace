@@ -24,10 +24,33 @@ const User = sequelize.define('User', {
       isEmail: true
     }
   },
+  password: {
+    type: DataTypes.VIRTUAL,
+    allowNull: true,
+    validate: {
+      len: [6, 255]
+    }
+  },
   passwordHash: {
     type: DataTypes.STRING,
-    allowNull: false,
+    allowNull: true,
     field: 'password_hash'
+  },
+  googleId: {
+    type: DataTypes.STRING,
+    allowNull: true,
+    unique: true,
+    field: 'google_id'
+  },
+  authProvider: {
+    type: DataTypes.ENUM('local', 'google', 'facebook'),
+    defaultValue: 'local',
+    field: 'auth_provider'
+  },
+  profilePicture: {
+    type: DataTypes.STRING,
+    allowNull: true,
+    field: 'profile_picture'
   },
   role: {
     type: DataTypes.ENUM('brand', 'influencer', 'admin'),
@@ -66,13 +89,11 @@ const User = sequelize.define('User', {
     beforeCreate: async (user) => {
       if (user.password) {
         user.passwordHash = await bcrypt.hash(user.password, 12);
-        delete user.password;
       }
     },
     beforeUpdate: async (user) => {
       if (user.password) {
         user.passwordHash = await bcrypt.hash(user.password, 12);
-        delete user.password;
       }
     }
   }
@@ -91,10 +112,37 @@ User.prototype.toJSON = function() {
 
 // Class methods
 User.associate = (models) => {
-  // Define associations here when other models are created
-  // User.hasOne(models.Brand, { foreignKey: 'userId' });
-  // User.hasOne(models.Influencer, { foreignKey: 'userId' });
-  // User.hasMany(models.Campaign, { foreignKey: 'brandId' });
+  // User has many social media accounts
+  if (models.SocialMediaAccount) {
+    User.hasMany(models.SocialMediaAccount, {
+      foreignKey: 'userId',
+      as: 'socialAccounts'
+    });
+  }
+  
+  // Brand users have many campaigns
+  if (models.Campaign) {
+    User.hasMany(models.Campaign, {
+      foreignKey: 'brandId',
+      as: 'campaigns'
+    });
+  }
+  
+  // Influencer users have many applications
+  if (models.CampaignApplication) {
+    User.hasMany(models.CampaignApplication, {
+      foreignKey: 'influencerId',
+      as: 'applications'
+    });
+  }
+  
+  // Analytics created by user
+  if (models.Analytics) {
+    User.hasMany(models.Analytics, {
+      foreignKey: 'createdBy',
+      as: 'analyticsCreated'
+    });
+  }
 };
 
 module.exports = User;

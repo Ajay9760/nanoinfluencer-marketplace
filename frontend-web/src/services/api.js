@@ -135,10 +135,48 @@ export const authAPI = {
   changePassword: async (passwordData) => {
     const response = await api.put('/auth/change-password', passwordData);
     return response.data;
+  },
+
+  googleLogin: async (googleData) => {
+    const response = await api.post('/auth/google', googleData);
+    const { user, accessToken, refreshToken } = response.data;
+    
+    tokenManager.setTokens(accessToken, refreshToken);
+    localStorage.setItem('user', JSON.stringify(user));
+    
+    return response.data;
   }
 };
 
-// Campaigns API (placeholder for future implementation)
+// Applications API
+export const applicationsAPI = {
+  getAll: async (params = {}) => {
+    const response = await api.get('/applications', { params });
+    return response.data;
+  },
+
+  getStats: async () => {
+    const response = await api.get('/applications/stats');
+    return response.data;
+  },
+
+  applyToCampaign: async (campaignId, applicationData) => {
+    const response = await api.post(`/applications/campaigns/${campaignId}`, applicationData);
+    return response.data;
+  },
+
+  updateStatus: async (applicationId, statusData) => {
+    const response = await api.put(`/applications/${applicationId}/status`, statusData);
+    return response.data;
+  },
+
+  submitContent: async (applicationId, contentData) => {
+    const response = await api.put(`/applications/${applicationId}/content`, contentData);
+    return response.data;
+  }
+};
+
+// Campaigns API
 export const campaignsAPI = {
   getAll: async (params = {}) => {
     const response = await api.get('/campaigns', { params });
@@ -184,15 +222,81 @@ export const influencersAPI = {
   }
 };
 
-// Analytics API (placeholder for future implementation)
+// Analytics API
 export const analyticsAPI = {
   getDashboardStats: async () => {
     const response = await api.get('/analytics/dashboard');
     return response.data;
   },
 
-  getCampaignAnalytics: async (campaignId) => {
-    const response = await api.get(`/analytics/campaigns/${campaignId}`);
+  getCampaignAnalytics: async (campaignId, startDate, endDate) => {
+    const params = {};
+    if (startDate) params.startDate = startDate;
+    if (endDate) params.endDate = endDate;
+    
+    const response = await api.get(`/analytics/campaigns/${campaignId}`, { params });
+    return response.data;
+  },
+
+  getInfluencerAnalytics: async (platform, startDate, endDate) => {
+    const params = {};
+    if (platform) params.platform = platform;
+    if (startDate) params.startDate = startDate;
+    if (endDate) params.endDate = endDate;
+    
+    const response = await api.get('/analytics/influencer', { params });
+    return response.data;
+  },
+
+  addAnalytics: async (analyticsData) => {
+    const response = await api.post('/analytics', analyticsData);
+    return response.data;
+  },
+
+  getPerformanceComparison: async (timeframe, platforms, metricTypes) => {
+    const params = { timeframe };
+    if (platforms) params.platforms = platforms.join(',');
+    if (metricTypes) params.metricTypes = metricTypes.join(',');
+    
+    const response = await api.get('/analytics/comparison', { params });
+    return response.data;
+  }
+};
+
+// Social Media API
+export const socialMediaAPI = {
+  getSocialAccounts: async () => {
+    const response = await api.get('/social-media');
+    return response.data;
+  },
+
+  addSocialAccount: async (accountData) => {
+    const response = await api.post('/social-media', accountData);
+    return response.data;
+  },
+
+  updateSocialAccount: async (id, accountData) => {
+    const response = await api.put(`/social-media/${id}`, accountData);
+    return response.data;
+  },
+
+  deleteSocialAccount: async (id) => {
+    const response = await api.delete(`/social-media/${id}`);
+    return response.data;
+  },
+
+  getSocialAccountById: async (id) => {
+    const response = await api.get(`/social-media/${id}`);
+    return response.data;
+  },
+
+  syncSocialAccount: async (id) => {
+    const response = await api.post(`/social-media/${id}/sync`);
+    return response.data;
+  },
+
+  getPlatformStats: async () => {
+    const response = await api.get('/social-media/stats');
     return response.data;
   }
 };

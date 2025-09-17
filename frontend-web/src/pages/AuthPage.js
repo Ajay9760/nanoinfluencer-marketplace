@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { GoogleLogin, GoogleOAuthProvider } from '@react-oauth/google';
 import { useAuth } from '../contexts/AuthContext';
 import toast from 'react-hot-toast';
 
@@ -13,7 +14,7 @@ const AuthPage = () => {
     confirmPassword: ''
   });
   
-  const { login, register, loading } = useAuth();
+  const { login, register, loading, googleLogin } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   
@@ -53,6 +54,24 @@ const AuthPage = () => {
     }
   };
 
+  const handleGoogleSuccess = async (credentialResponse) => {
+    try {
+      const result = await googleLogin(credentialResponse.credential, userType);
+      if (result.success) {
+        toast.success('Welcome! Signed in with Google successfully.');
+        navigate(from, { replace: true });
+      } else {
+        toast.error(result.error || 'Google sign-in failed');
+      }
+    } catch (error) {
+      toast.error('Google sign-in failed. Please try again.');
+    }
+  };
+
+  const handleGoogleError = () => {
+    toast.error('Google sign-in was cancelled or failed');
+  };
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full space-y-8">
@@ -72,11 +91,6 @@ const AuthPage = () => {
               {isLogin ? 'create a new account' : 'sign in to existing account'}
             </button>
           </p>
-          <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-            <p className="text-sm text-blue-800 text-center">
-              <strong>Demo:</strong> Use any email and password to sign in
-            </p>
-          </div>
         </div>
 
         {!isLogin && (
@@ -228,12 +242,23 @@ const AuthPage = () => {
             </div>
 
             <div className="mt-6">
-              <button
-                type="button"
-                className="w-full inline-flex justify-center py-2 px-4 border border-gray-300 rounded-md shadow-sm bg-white text-sm font-medium text-gray-500 hover:bg-gray-50"
-              >
-                <span>Continue with Google</span>
-              </button>
+              {process.env.REACT_APP_GOOGLE_CLIENT_ID ? (
+                <GoogleOAuthProvider clientId={process.env.REACT_APP_GOOGLE_CLIENT_ID}>
+                  <GoogleLogin
+                    onSuccess={handleGoogleSuccess}
+                    onError={handleGoogleError}
+                    theme="outline"
+                    size="large"
+                    width="100%"
+                    text={isLogin ? "signin_with" : "signup_with"}
+                  />
+                </GoogleOAuthProvider>
+              ) : (
+                <div className="text-center text-sm text-gray-500">
+                  <p>Google OAuth available when configured</p>
+                  <p className="text-xs mt-1">Contact admin to enable Google sign-in</p>
+                </div>
+              )}
             </div>
           </div>
         </form>

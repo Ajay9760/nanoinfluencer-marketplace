@@ -22,7 +22,7 @@ export const AuthProvider = ({ children }) => {
       try {
         setUser(JSON.parse(savedUser));
       } catch (error) {
-        console.error('Error parsing saved user:', error);
+        // console.error('Error parsing saved user:', error); // ESLint: no-console
         localStorage.removeItem('user');
       }
     }
@@ -66,10 +66,24 @@ export const AuthProvider = ({ children }) => {
     try {
       await authAPI.logout();
     } catch (error) {
-      console.error('Logout error:', error);
+      // console.error('Logout error:', error); // ESLint: no-console
     } finally {
       setUser(null);
       tokenManager.clearTokens();
+    }
+  };
+
+  const googleLogin = async (credential, userType = 'brand') => {
+    setLoading(true);
+    try {
+      const response = await authAPI.googleLogin({ credential, role: userType });
+      setUser(response.user);
+      return { success: true, user: response.user };
+    } catch (error) {
+      const errorResult = apiUtils.handleApiError(error);
+      return { success: false, error: errorResult.error };
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -79,6 +93,7 @@ export const AuthProvider = ({ children }) => {
     login,
     register,
     logout,
+    googleLogin,
     isAuthenticated: !!user && !!tokenManager.getAccessToken(),
   };
 
