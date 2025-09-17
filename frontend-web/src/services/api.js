@@ -4,6 +4,62 @@ import toast from 'react-hot-toast';
 // API base configuration
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001/api';
 
+// Check if we're in GitHub Pages demo mode
+const isGitHubPages = window.location.hostname === 'ajay9760.github.io';
+const isDemoMode = isGitHubPages || process.env.REACT_APP_DEMO_MODE === 'true';
+
+// Demo data for GitHub Pages
+const demoData = {
+  user: {
+    id: 'demo-user-1',
+    name: 'Demo User',
+    email: 'demo@nanoinfluencer.com',
+    role: 'brand',
+    status: 'active'
+  },
+  campaigns: [
+    {
+      id: '1',
+      title: 'Summer Fashion Collection',
+      description: 'Promote our new summer fashion line to young adults',
+      goal: 'awareness',
+      budget: 5000,
+      currency: 'USD',
+      status: 'active',
+      brand: { name: 'Fashion Forward', email: 'hello@fashionforward.com' }
+    },
+    {
+      id: '2', 
+      title: 'Tech Product Launch',
+      description: 'Launch our new smartphone with tech influencers',
+      goal: 'conversions',
+      budget: 10000,
+      currency: 'USD', 
+      status: 'draft',
+      brand: { name: 'TechCorp', email: 'marketing@techcorp.com' }
+    }
+  ],
+  analytics: {
+    stats: {
+      totalCampaigns: 12,
+      activeCampaigns: 5,
+      totalBudget: 45000,
+      approvedInfluencers: 23,
+      totalFollowers: 150000,
+      totalApplications: 8,
+      potentialEarnings: 2500,
+      averageEngagementRate: 4.2
+    }
+  }
+};
+
+// Demo API functions
+const createDemoPromise = (data, delay = 500) => {
+  return new Promise(resolve => {
+    setTimeout(() => resolve({ data }), delay);
+  });
+};
+
 // Create axios instance with base configuration
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -94,6 +150,12 @@ api.interceptors.response.use(
 // Authentication API
 export const authAPI = {
   register: async (userData) => {
+    if (isDemoMode) {
+      const user = { ...demoData.user, ...userData, id: 'demo-' + Date.now() };
+      localStorage.setItem('user', JSON.stringify(user));
+      return createDemoPromise({ user, accessToken: 'demo-token', refreshToken: 'demo-refresh' });
+    }
+    
     const response = await api.post('/auth/register', userData);
     const { user, accessToken, refreshToken } = response.data;
     
@@ -104,8 +166,15 @@ export const authAPI = {
   },
 
   login: async (credentials) => {
+    if (isDemoMode) {
+      const user = { ...demoData.user, email: credentials.email };
+      localStorage.setItem('user', JSON.stringify(user));
+      return createDemoPromise({ user, accessToken: 'demo-token', refreshToken: 'demo-refresh' });
+    }
+    
     const response = await api.post('/auth/login', credentials);
     const { user, accessToken, refreshToken } = response.data;
+    
     
     tokenManager.setTokens(accessToken, refreshToken);
     localStorage.setItem('user', JSON.stringify(user));
@@ -225,6 +294,10 @@ export const influencersAPI = {
 // Analytics API
 export const analyticsAPI = {
   getDashboardStats: async () => {
+    if (isDemoMode) {
+      return createDemoPromise(demoData.analytics);
+    }
+    
     const response = await api.get('/analytics/dashboard');
     return response.data;
   },

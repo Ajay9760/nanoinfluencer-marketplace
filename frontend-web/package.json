@@ -2,6 +2,7 @@
   "name": "nanoinfluencer-frontend-web",
   "version": "1.0.0",
   "description": "Web frontend for NanoInfluencer MarketPlace",
+  "homepage": "https://ajay9760.github.io/nanoinfluencer-marketplace",
   "private": true,
   "dependencies": {
     "@headlessui/react": "^1.7.17",

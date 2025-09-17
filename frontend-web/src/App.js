@@ -4,6 +4,7 @@ import { Helmet } from 'react-helmet-async';
 
 import Layout from './components/Layout';
 import PrivateRoute from './components/PrivateRoute';
+import DemoBanner from './components/DemoBanner';
 import HomePage from './pages/HomePage';
 import AuthPage from './pages/AuthPage';
 import DashboardPage from './pages/DashboardPage';
@@ -38,6 +39,7 @@ function App() {
         <meta property="twitter:description" content="Connect brands with nano-influencers for authentic marketing campaigns" />
       </Helmet>
       
+      <DemoBanner />
       <div className="App min-h-screen bg-gray-50">
         <Routes>
           {/* Public routes */}

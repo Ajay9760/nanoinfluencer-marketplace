@@ -2,9 +2,12 @@
 
 > **Connecting brands with authentic nano-influencers for impactful marketing campaigns**
 
+🚀 **[View Live Website](https://ajay9760.github.io/nanoinfluencer-marketplace)** | 📚 **[Documentation](docs/)** | 🎬 **[Video Demo](https://youtu.be/demo)**
+
+[![Live Website](https://img.shields.io/badge/Live-Website-success)](https://ajay9760.github.io/nanoinfluencer-marketplace)
+[![GitHub Pages](https://github.com/Ajay9760/nanoinfluencer-marketplace/actions/workflows/deploy-pages.yml/badge.svg)](https://github.com/Ajay9760/nanoinfluencer-marketplace/actions/workflows/deploy-pages.yml)
 [![GitHub Stars](https://img.shields.io/github/stars/Ajay9760/nanoinfluencer-marketplace?style=social)](https://github.com/Ajay9760/nanoinfluencer-marketplace)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![CI](https://github.com/Ajay9760/nanoinfluencer-marketplace/workflows/✅%20Simple%20CI/badge.svg)](https://github.com/Ajay9760/nanoinfluencer-marketplace/actions)
 [![Security](https://img.shields.io/badge/security-A-green)](https://github.com/Ajay9760/nanoinfluencer-marketplace)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 
@@ -141,6 +144,27 @@ cd frontend-web && npm start
 - ⚡ **API**: http://localhost:3001/api
 - 🗄️ **Database Admin**: http://localhost:8080
 - 📧 **Email Testing**: http://localhost:8025
+
+---
+
+## 🌍 **Live Website**
+
+🚀 **Experience the live application**: [https://ajay9760.github.io/nanoinfluencer-marketplace](https://ajay9760.github.io/nanoinfluencer-marketplace)
+
+### **What you can do on the live site:**
+- 🏠 **Explore the homepage** with feature overview
+- 🔐 **Create accounts** as Brand or Influencer
+- 📊 **View the dashboard** with sample data
+- 📱 **Test responsive design** on any device
+- ✨ **Experience the full UI/UX** without local setup
+
+### **GitHub Pages Deployment**
+- 🚀 **Automatic deployment** on every push to main
+- 🔄 **Build status**: [![GitHub Pages](https://github.com/Ajay9760/nanoinfluencer-marketplace/actions/workflows/deploy-pages.yml/badge.svg)](https://github.com/Ajay9760/nanoinfluencer-marketplace/actions/workflows/deploy-pages.yml)
+- 🌍 **CDN-powered** for fast global access
+- 📱 **Mobile-optimized** responsive design
+
+> **Note**: The live site runs frontend-only. For full backend functionality, run locally as described above.
 
 ---
 
