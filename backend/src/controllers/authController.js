@@ -1,6 +1,67 @@
 const User = require('../models/User');
-const { generateTokenPair, verifyRefreshToken } = require('../utils/jwt');
+const RefreshToken = require('../models/RefreshToken');
+const { 
+  generateTokenPair, 
+  verifyRefreshToken, 
+  generateTokenHash, 
+  getTokenExpirationDate, 
+  REFRESH_TOKEN_EXPIRES_IN 
+} = require('../utils/jwt');
 const { validationResult } = require('express-validator');
+
+/**
+ * Set httpOnly refresh token cookie
+ */
+const setRefreshTokenCookie = (res, refreshToken) => {
+  const cookieOptions = {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production', // HTTPS only in production
+    sameSite: process.env.NODE_ENV === 'production' ? 'strict' : 'lax',
+    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days in milliseconds
+    path: '/api/auth' // Restrict cookie to auth endpoints
+  };
+  
+  res.cookie('refreshToken', refreshToken, cookieOptions);
+};
+
+/**
+ * Clear refresh token cookie
+ */
+const clearRefreshTokenCookie = (res) => {
+  res.clearCookie('refreshToken', {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: process.env.NODE_ENV === 'production' ? 'strict' : 'lax',
+    path: '/api/auth'
+  });
+};
+
+/**
+ * Get client IP address
+ */
+const getClientIp = (req) => {
+  return req.ip || req.connection.remoteAddress || req.socket.remoteAddress || 'unknown';
+};
+
+/**
+ * Create and store refresh token
+ */
+const createAndStoreRefreshToken = async (user, refreshToken, req) => {
+  const decoded = verifyRefreshToken(refreshToken);
+  const tokenHash = generateTokenHash(refreshToken);
+  const expiresAt = getTokenExpirationDate(REFRESH_TOKEN_EXPIRES_IN);
+  const clientIp = getClientIp(req);
+  
+  await RefreshToken.createToken(
+    user.id,
+    tokenHash,
+    decoded.jti,
+    expiresAt,
+    clientIp
+  );
+  
+  return { tokenHash, jti: decoded.jti };
+};
 
 /**
  * Register a new user
@@ -44,13 +105,21 @@ const register = async (req, res) => {
     // Generate JWT tokens
     const tokens = generateTokenPair(user);
 
+    // Store refresh token in database
+    await createAndStoreRefreshToken(user, tokens.refreshToken, req);
+
+    // Set httpOnly cookie for refresh token
+    setRefreshTokenCookie(res, tokens.refreshToken);
+
     // Update last login
     await user.update({ lastLoginAt: new Date() });
 
     res.status(201).json({
       message: 'User registered successfully',
       user: user.toJSON(),
-      ...tokens
+      accessToken: tokens.accessToken,
+      accessTokenExpiresIn: tokens.accessTokenExpiresIn
+      // Note: refreshToken is not sent in response, only in httpOnly cookie
     });
 
   } catch (error) {
@@ -108,13 +177,21 @@ const login = async (req, res) => {
     // Generate JWT tokens
     const tokens = generateTokenPair(user);
 
+    // Store refresh token in database
+    await createAndStoreRefreshToken(user, tokens.refreshToken, req);
+
+    // Set httpOnly cookie for refresh token
+    setRefreshTokenCookie(res, tokens.refreshToken);
+
     // Update last login
     await user.update({ lastLoginAt: new Date() });
 
     res.json({
       message: 'Login successful',
       user: user.toJSON(),
-      ...tokens
+      accessToken: tokens.accessToken,
+      accessTokenExpiresIn: tokens.accessTokenExpiresIn
+      // Note: refreshToken is not sent in response, only in httpOnly cookie
     });
 
   } catch (error) {
@@ -127,25 +204,57 @@ const login = async (req, res) => {
 };
 
 /**
- * Refresh access token using refresh token
+ * Refresh access token using refresh token with rotation
  */
 const refreshToken = async (req, res) => {
   try {
-    const { refreshToken } = req.body;
+    // Get refresh token from httpOnly cookie or fallback to body (for backward compatibility)
+    const refreshToken = req.cookies.refreshToken || req.body.refreshToken;
+    const clientIp = getClientIp(req);
 
     if (!refreshToken) {
       return res.status(400).json({
         error: 'Refresh token required',
-        message: 'Please provide a refresh token'
+        message: 'No refresh token provided'
       });
     }
 
     // Verify refresh token
-    const decoded = verifyRefreshToken(refreshToken);
-    
-    // Get user
-    const user = await User.findByPk(decoded.id);
+    let decoded;
+    try {
+      decoded = verifyRefreshToken(refreshToken);
+    } catch (error) {
+      clearRefreshTokenCookie(res);
+      return res.status(401).json({
+        error: 'Token refresh failed',
+        message: error.message
+      });
+    }
+
+    // Find the stored refresh token
+    const tokenHash = generateTokenHash(refreshToken);
+    const storedToken = await RefreshToken.findByTokenHash(tokenHash);
+
+    if (!storedToken) {
+      clearRefreshTokenCookie(res);
+      return res.status(401).json({
+        error: 'Invalid refresh token',
+        message: 'Refresh token not found or has been revoked'
+      });
+    }
+
+    // Check if token is active (not revoked and not expired)
+    if (!storedToken.isActive()) {
+      clearRefreshTokenCookie(res);
+      return res.status(401).json({
+        error: 'Token expired or revoked',
+        message: 'Please login again'
+      });
+    }
+
+    const user = storedToken.user;
     if (!user) {
+      clearRefreshTokenCookie(res);
       return res.status(401).json({
         error: 'Invalid refresh token',
         message: 'User not found'
@@ -153,6 +262,7 @@ const refreshToken = async (req, res) => {
     }
 
     if (user.status !== 'active') {
+      clearRefreshTokenCookie(res);
       return res.status(403).json({
         error: 'Account access denied',
         message: 'Your account is not active'
@@ -161,18 +271,69 @@ const refreshToken = async (req, res) => {
 
     // Generate new token pair
     const tokens = generateTokenPair(user);
+    const newTokenHash = generateTokenHash(tokens.refreshToken);
+
+    // Revoke old refresh token and create new one (token rotation)
+    await storedToken.revoke(clientIp, newTokenHash);
+    await createAndStoreRefreshToken(user, tokens.refreshToken, req);
+
+    // Set new refresh token cookie
+    setRefreshTokenCookie(res, tokens.refreshToken);
 
     res.json({
       message: 'Token refreshed successfully',
       user: user.toJSON(),
-      ...tokens
+      accessToken: tokens.accessToken,
+      accessTokenExpiresIn: tokens.accessTokenExpiresIn
+      // Note: New refresh token is in httpOnly cookie, old one is revoked
     });
 
   } catch (error) {
     console.error('Token refresh error:', error);
+    clearRefreshTokenCookie(res);
     res.status(401).json({
       error: 'Token refresh failed',
-      message: 'Invalid or expired refresh token'
+      message: 'An error occurred during token refresh'
+    });
+  }
+};
+
+/**
+ * Logout user and revoke refresh token
+ */
+const logout = async (req, res) => {
+  try {
+    const refreshToken = req.cookies.refreshToken || req.body.refreshToken;
+    const clientIp = getClientIp(req);
+
+    if (refreshToken) {
+      try {
+        const tokenHash = generateTokenHash(refreshToken);
+        const storedToken = await RefreshToken.findByTokenHash(tokenHash);
+        
+        if (storedToken && storedToken.isActive()) {
+          await storedToken.revoke(clientIp);
+        }
+      } catch (error) {
+        // Log error but don't fail logout
+        console.error('Error revoking refresh token during logout:', error);
+      }
+    }
+
+    // Clear refresh token cookie
+    clearRefreshTokenCookie(res);
+
+    res.json({
+      message: 'Logout successful'
+    });
+
+  } catch (error) {
+    console.error('Logout error:', error);
+    // Always clear cookie even if there was an error
+    clearRefreshTokenCookie(res);
+    res.status(500).json({
+      error: 'Logout failed',
+      message: 'An error occurred during logout'
     });
   }
 };
@@ -279,28 +440,61 @@ const googleLogin = async (req, res) => {
   try {
     const { credential, role = 'influencer' } = req.body;
 
-    // TODO: Implement real Google OAuth verification
-    // const { OAuth2Client } = require('google-auth-library');
-    // const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
-    // const ticket = await client.verifyIdToken({
-    //   idToken: credential,
-    //   audience: process.env.GOOGLE_CLIENT_ID,
-    // });
-    // const googleUser = ticket.getPayload();
+    if (!credential) {
+      return res.status(400).json({
+        error: 'Google credential required',
+        message: 'Please provide Google credential token'
+      });
+    }
+
+    let googleUser;
     
-    // For now, return error until proper Google OAuth is configured
-    return res.status(501).json({
-      error: 'Google OAuth not configured',
-      message: 'Google authentication requires proper OAuth setup'
-    });
+    // If Google Client ID is configured, verify the token
+    if (process.env.GOOGLE_CLIENT_ID) {
+      try {
+        const { OAuth2Client } = require('google-auth-library');
+        const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+        const ticket = await client.verifyIdToken({
+          idToken: credential,
+          audience: process.env.GOOGLE_CLIENT_ID,
+        });
+        googleUser = ticket.getPayload();
+      } catch (verificationError) {
+        console.error('Google token verification failed:', verificationError);
+        return res.status(400).json({
+          error: 'Invalid Google token',
+          message: 'Google token verification failed'
+        });
+      }
+    } else {
+      // For development/demo purposes, decode the JWT without verification
+      // WARNING: This should NEVER be used in production!
+      try {
+        const jwt = require('jsonwebtoken');
+        googleUser = jwt.decode(credential);
+        
+        if (!googleUser || !googleUser.email) {
+          return res.status(400).json({
+            error: 'Invalid Google credential',
+            message: 'Could not decode Google user information'
+          });
+        }
+      } catch (decodeError) {
+        console.error('Failed to decode Google credential:', decodeError);
+        return res.status(400).json({
+          error: 'Invalid Google credential format',
+          message: 'Google credential could not be processed'
+        });
+      }
+    }
 
     // Check if user already exists
     const { Op } = require('sequelize');
     let user = await User.findOne({ 
       where: { 
         [Op.or]: [
-          { email: mockGoogleUser.email },
-          { googleId: mockGoogleUser.googleId }
+          { email: googleUser.email },
+          { googleId: googleUser.sub || googleUser.id }
         ]
       } 
     });
@@ -308,14 +502,24 @@ const googleLogin = async (req, res) => {
     if (!user) {
       // Create new user
       user = await User.create({
-        name: mockGoogleUser.name,
-        email: mockGoogleUser.email,
-        googleId: mockGoogleUser.googleId,
-        profilePicture: mockGoogleUser.picture,
+        name: googleUser.name,
+        email: googleUser.email,
+        googleId: googleUser.sub || googleUser.id,
+        profilePicture: googleUser.picture,
         role,
         status: 'active',
         authProvider: 'google'
       });
+    } else {
+      // Update existing user with Google info if missing
+      const updateData = {};
+      if (!user.googleId) updateData.googleId = googleUser.sub || googleUser.id;
+      if (!user.profilePicture && googleUser.picture) updateData.profilePicture = googleUser.picture;
+      if (!user.authProvider) updateData.authProvider = 'google';
+      
+      if (Object.keys(updateData).length > 0) {
+        await user.update(updateData);
+      }
     }
 
     // Check if account is active
@@ -329,13 +533,21 @@ const googleLogin = async (req, res) => {
     // Generate JWT tokens
     const tokens = generateTokenPair(user);
 
+    // Store refresh token in database
+    await createAndStoreRefreshToken(user, tokens.refreshToken, req);
+
+    // Set httpOnly cookie for refresh token
+    setRefreshTokenCookie(res, tokens.refreshToken);
+
     // Update last login
     await user.update({ lastLoginAt: new Date() });
 
     res.json({
       message: 'Google login successful',
       user: user.toJSON(),
-      ...tokens
+      accessToken: tokens.accessToken,
+      accessTokenExpiresIn: tokens.accessTokenExpiresIn
+      // Note: refreshToken is not sent in response, only in httpOnly cookie
     });
 
   } catch (error) {
@@ -351,6 +563,7 @@ module.exports = {
   register,
   login,
   refreshToken,
+  logout,
   getProfile,
   updateProfile,
   changePassword,

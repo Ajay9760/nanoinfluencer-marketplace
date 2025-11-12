@@ -16,8 +16,9 @@ export default defineConfig({
   /* Reporter to use. See https://playwright.dev/docs/test-reporters */
   reporter: [
     ['html'],
+    ['junit', { outputFile: 'test-results/junit.xml' }],
     ['json', { outputFile: 'test-results/results.json' }],
-    ['junit', { outputFile: 'test-results/results.xml' }]
+    process.env.CI ? ['github'] : ['list']
   ],
   /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
   use: {
@@ -40,31 +41,71 @@ export default defineConfig({
   /* Global timeout for each test */
   timeout: 30000,
 
+  /* Global setup and teardown */
+  globalSetup: './tests/e2e/global-setup.js',
+  globalTeardown: './tests/e2e/global-teardown.js',
+
   /* Configure projects for major browsers */
   projects: [
     {
+      name: 'setup',
+      testMatch: /.*\.setup\.js/,
+    },
+    
+    {
       name: 'chromium',
-      use: { ...devices['Desktop Chrome'] },
+      use: { 
+        ...devices['Desktop Chrome'],
+        // Use prepared auth state
+        storageState: './tests/e2e/storage-state.json',
+      },
+      dependencies: ['setup'],
     },
 
     {
       name: 'firefox',
-      use: { ...devices['Desktop Firefox'] },
+      use: { 
+        ...devices['Desktop Firefox'],
+        storageState: './tests/e2e/storage-state.json',
+      },
+      dependencies: ['setup'],
     },
 
     {
       name: 'webkit',
-      use: { ...devices['Desktop Safari'] },
+      use: { 
+        ...devices['Desktop Safari'],
+        storageState: './tests/e2e/storage-state.json',
+      },
+      dependencies: ['setup'],
     },
 
     /* Test against mobile viewports. */
     {
       name: 'Mobile Chrome',
-      use: { ...devices['Pixel 5'] },
+      use: { 
+        ...devices['Pixel 5'],
+        storageState: './tests/e2e/storage-state.json',
+      },
+      dependencies: ['setup'],
     },
+    
     {
       name: 'Mobile Safari',
-      use: { ...devices['iPhone 12'] },
+      use: { 
+        ...devices['iPhone 12'],
+        storageState: './tests/e2e/storage-state.json',
+      },
+      dependencies: ['setup'],
+    },
+
+    /* API Testing */
+    {
+      name: 'api',
+      testMatch: '**/api/**/*.spec.js',
+      use: {
+        baseURL: process.env.API_BASE_URL || 'http://localhost:3001/api',
+      },
     },
 
     /* Test against branded browsers. */
@@ -79,28 +120,43 @@ export default defineConfig({
   ],
 
   /* Run your local dev server before starting the tests */
-  webServer: [
+  webServer: process.env.CI ? undefined : [
     {
       command: 'cd backend && npm start',
       port: 3001,
+      timeout: 120000,
       reuseExistingServer: !process.env.CI,
       env: {
         NODE_ENV: 'test',
         DB_HOST: 'localhost',
         DB_PORT: '5432',
-        DB_NAME: 'nanoinfluencer_test',
-        DB_USER: 'postgres',
+        DB_NAME: 'test_db',
+        DB_USER: 'test_user',
         DB_PASSWORD: 'test_password',
         REDIS_URL: 'redis://localhost:6379',
-        JWT_SECRET: 'test-secret',
-        SMTP_HOST: 'localhost',
-        SMTP_PORT: '1025',
-      }
+        ACCESS_TOKEN_SECRET: 'test-access-secret-for-e2e-testing-32-chars',
+        REFRESH_TOKEN_SECRET: 'test-refresh-secret-for-e2e-testing-32-chars',
+        ENABLE_VIRUS_SCANNER: 'false',
+      },
     },
     {
-      command: 'cd frontend-web && npm run build && npx serve -s build -p 3000',
+      command: 'cd frontend-web && npm start',
       port: 3000,
+      timeout: 120000,
       reuseExistingServer: !process.env.CI,
-    }
+      env: {
+        REACT_APP_API_URL: 'http://localhost:3001/api',
+        REACT_APP_DEMO_MODE: 'false',
+      },
+    },
   ],
+
+  /* Test output directory */
+  outputDir: './test-results',
+
+  /* Maximum time one test can run for. */
+  expect: {
+    /* Maximum time expect() should wait for the condition to be met. */
+    timeout: 10000,
+  },
 });

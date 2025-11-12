@@ -32,6 +32,13 @@ router.post('/login', validateLogin, authController.login);
 router.post('/refresh', authController.refreshToken);
 
 /**
+ * @route   POST /api/auth/logout
+ * @desc    Logout user and revoke refresh token
+ * @access  Public
+ */
+router.post('/logout', authController.logout);
+
+/**
  * @route   GET /api/auth/profile
  * @desc    Get current user profile
  * @access  Private

@@ -5,22 +5,91 @@
     <link rel="icon" href="%PUBLIC_URL%/favicon.ico" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="theme-color" content="#2563eb" />
-    <meta
-      name="description"
-      content="Connect brands with nano-influencers for authentic marketing campaigns"
-    />
-    <link rel="apple-touch-icon" href="%PUBLIC_URL%/logo192.png" />
-    <link rel="manifest" href="%PUBLIC_URL%/manifest.json" />
     
-    <!-- Inter font for better typography -->
+    <!-- Primary Meta Tags -->
+    <title>🌟 NanoInfluencer Marketplace - Connect Brands with Authentic Nano-Influencers</title>
+    <meta name="title" content="NanoInfluencer Marketplace - Connect Brands with Authentic Nano-Influencers" />
+    <meta name="description" content="Secure marketplace connecting brands with nano-influencers (1K-100K followers) for authentic marketing campaigns. Higher engagement rates, better ROI, affordable pricing." />
+    <meta name="keywords" content="nano influencers, influencer marketing, brand collaboration, social media marketing, authentic content, micro influencers, marketing platform, content creators" />
+    <meta name="author" content="NanoInfluencer Team" />
+    <meta name="robots" content="index, follow" />
+    
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://ajay9760.github.io/nanoinfluencer-marketplace/" />
+    <meta property="og:title" content="NanoInfluencer Marketplace - Connect Brands with Authentic Nano-Influencers" />
+    <meta property="og:description" content="Secure marketplace connecting brands with nano-influencers for authentic marketing campaigns. Higher engagement rates, better ROI." />
+    <meta property="og:image" content="%PUBLIC_URL%/og-image.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:site_name" content="NanoInfluencer Marketplace" />
+    
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:url" content="https://ajay9760.github.io/nanoinfluencer-marketplace/" />
+    <meta name="twitter:title" content="NanoInfluencer Marketplace - Connect Brands with Authentic Nano-Influencers" />
+    <meta name="twitter:description" content="Secure marketplace connecting brands with nano-influencers for authentic marketing campaigns. Higher engagement rates, better ROI." />
+    <meta name="twitter:image" content="%PUBLIC_URL%/og-image.png" />
+    
+    <!-- Favicon and Icons -->
+    <link rel="apple-touch-icon" sizes="180x180" href="%PUBLIC_URL%/apple-touch-icon.png" />
+    <link rel="icon" type="image/png" sizes="32x32" href="%PUBLIC_URL%/favicon-32x32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="%PUBLIC_URL%/favicon-16x16.png" />
+    <link rel="manifest" href="%PUBLIC_URL%/manifest.json" />
+    <link rel="mask-icon" href="%PUBLIC_URL%/safari-pinned-tab.svg" color="#2563eb" />
+    <meta name="msapplication-TileColor" content="#2563eb" />
+    
+    <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
     
-    <title>NanoInfluencer MarketPlace</title>
+    <!-- Performance and Security -->
+    <link rel="dns-prefetch" href="//fonts.googleapis.com">
+    <link rel="dns-prefetch" href="//fonts.gstatic.com">
+    
+    <!-- Structured Data -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "SoftwareApplication",
+      "name": "NanoInfluencer Marketplace",
+      "description": "A secure marketplace connecting brands with nano-influencers for authentic marketing campaigns",
+      "url": "https://ajay9760.github.io/nanoinfluencer-marketplace/",
+      "applicationCategory": "BusinessApplication",
+      "operatingSystem": "Web",
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "USD"
+      },
+      "author": {
+        "@type": "Organization",
+        "name": "NanoInfluencer Team"
+      }
+    }
+    </script>
   </head>
   <body>
-    <noscript>You need to enable JavaScript to run this app.</noscript>
-    <div id="root"></div>
+    <noscript>
+      <div style="text-align: center; padding: 2rem; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', sans-serif;">
+        <h1>🌟 NanoInfluencer Marketplace</h1>
+        <p>You need to enable JavaScript to run this app.</p>
+        <p>Please enable JavaScript in your browser and refresh the page.</p>
+      </div>
+    </noscript>
+    <div id="root" role="main" aria-label="NanoInfluencer Marketplace Application"></div>
+    
+    <!-- Accessibility: Skip to main content link -->
+    <script>
+      // Add skip link for keyboard users
+      (function() {
+        const skipLink = document.createElement('a');
+        skipLink.href = '#main-content';
+        skipLink.className = 'sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-50 focus:bg-blue-600 focus:text-white focus:px-4 focus:py-2 focus:rounded';
+        skipLink.textContent = 'Skip to main content';
+        document.body.insertBefore(skipLink, document.body.firstChild);
+      })();
+    </script>
   </body>
 </html>

@@ -4,6 +4,7 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const morgan = require('morgan');
+const cookieParser = require('cookie-parser');
 
 // Import security and monitoring modules
 const { initSentry, requestHandler, tracingHandler, errorHandler: sentryErrorHandler, performanceMiddleware } = require('./utils/sentry');
@@ -12,11 +13,7 @@ const { logger, metricsMiddleware, healthCheck, errorHandler: monitoringErrorHan
 
 // Import database and models
 const { testConnection, sequelize } = require('./config/database');
-const User = require('./models/User');
-const Campaign = require('./models/Campaign');
-const SocialMediaAccount = require('./models/SocialMediaAccount');
-const CampaignApplication = require('./models/CampaignApplication');
-const Analytics = require('./models/Analytics');
+const models = require('./models'); // This handles all models and associations
 
 // Initialize Sentry first (before other imports)
 initSentry();
@@ -52,6 +49,9 @@ app.use(cors({
 
 // Request sanitization
 app.use(sanitizeRequest);
+
+// Cookie parsing middleware
+app.use(cookieParser());
 
 // Body parsing middleware with size limits
 app.use(express.json({ 
@@ -107,16 +107,41 @@ app.get('/metrics', async (req, res) => {
   }
 });
 
+// Root route with API information
+app.get('/', (req, res) => {
+  res.json({
+    name: 'NanoInfluencer Marketplace API',
+    version: '1.0.0',
+    status: 'running',
+    timestamp: new Date().toISOString(),
+    endpoints: {
+      health: '/api/health',
+      metrics: '/metrics',
+      auth: '/api/auth',
+      campaigns: '/api/campaigns',
+      applications: '/api/applications',
+      socialMedia: '/api/social-media',
+      analytics: '/api/analytics',
+      search: '/api/search',
+      profile: '/api/profile',
+      influencers: '/api/influencers',
+      payments: '/api/payments'
+    },
+    documentation: 'API documentation available at /api-docs (when implemented)'
+  });
+});
+
 // API routes with specific rate limiting
 app.use('/api/auth', authLimiter, require('./routes/auth'));
 app.use('/api/campaigns', require('./routes/campaigns'));
 app.use('/api/applications', require('./routes/applications'));
 app.use('/api/social-media', require('./routes/socialMedia'));
 app.use('/api/analytics', require('./routes/analytics'));
-// Additional routes will be added here
-// app.use('/api/influencers', require('./routes/influencers'));
-// app.use('/api/brands', require('./routes/brands'));
-// app.use('/api/payments', require('./routes/payments'));
+app.use('/api/search', require('./routes/search'));
+app.use('/api/profile', require('./routes/profile'));
+app.use('/api/influencers', require('./routes/influencers'));
+app.use('/api/payments', require('./routes/payments'));
+app.use('/api/uploads', require('./routes/uploads'));
 
 // 404 handler
 app.use('*', (req, res) => {
@@ -140,6 +165,9 @@ app.use(sentryErrorHandler());
 // Global error handler with monitoring
 app.use(monitoringErrorHandler);
 
+// Initialize virus scan worker
+const { initializeVirusScanWorker } = require('./workers/virusScanWorker');
+
 // Initialize database and start server
 const startServer = async () => {
   try {
@@ -149,25 +177,18 @@ const startServer = async () => {
     await testConnection();
     logger.info('Database connection established successfully');
     
-    // Set up model associations
-    const models = { 
-      User, 
-      Campaign, 
-      SocialMediaAccount, 
-      CampaignApplication, 
-      Analytics 
-    };
-    Object.keys(models).forEach(modelName => {
-      if (models[modelName].associate) {
-        models[modelName].associate(models);
-      }
-    });
+    // Model associations are already configured in models/index.js
     logger.info('Model associations configured');
     
     // Sync database models (create tables if they don't exist)
     // Use force: true to recreate tables with new schema during development
     await sequelize.sync({ force: process.env.NODE_ENV !== 'production', alter: process.env.NODE_ENV === 'production' });
     logger.info('Database models synchronized successfully');
+    
+    // Initialize virus scan worker
+    if (process.env.ENABLE_VIRUS_SCANNER !== 'false') {
+      initializeVirusScanWorker();
+    }
     
     // Start server
     const server = app.listen(PORT, () => {

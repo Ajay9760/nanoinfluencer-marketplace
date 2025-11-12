@@ -148,6 +148,32 @@ const Campaign = sequelize.define('Campaign', {
     type: DataTypes.STRING,
     allowNull: true,
     field: 'custom_landing_page'
+  },
+  
+  // Payment and escrow fields
+  escrowId: {
+    type: DataTypes.STRING,
+    allowNull: true,
+    field: 'escrow_id',
+    comment: 'Stripe Payment Intent ID for escrow'
+  },
+  paymentStatus: {
+    type: DataTypes.ENUM('pending', 'funded', 'released', 'refunded'),
+    defaultValue: 'pending',
+    field: 'payment_status',
+    comment: 'Status of campaign payment'
+  },
+  fundedAt: {
+    type: DataTypes.DATE,
+    allowNull: true,
+    field: 'funded_at',
+    comment: 'When the campaign was funded'
+  },
+  refundedAt: {
+    type: DataTypes.DATE,
+    allowNull: true,
+    field: 'refunded_at',
+    comment: 'When the campaign was refunded'
   }
 }, {
   tableName: 'campaigns',

@@ -1,9 +1,20 @@
 # Backend Production Dockerfile
-FROM node:18-alpine AS base
+FROM node:18-bullseye AS base
+
+# Install system dependencies including ClamAV for virus scanning
+RUN apt-get update && apt-get install -y \
+    python3 \
+    make \
+    g++ \
+    clamav \
+    clamav-daemon \
+    clamav-freshclam \
+    curl \
+    wget \
+    && rm -rf /var/lib/apt/lists/*
 
 # Install dependencies only when needed
 FROM base AS deps
-RUN apk add --no-cache libc6-compat python3 make g++
 WORKDIR /app
 
 # Copy package files
@@ -47,6 +58,9 @@ COPY --chown=nodejs:nodejs . .
 
 # Create logs directory
 RUN mkdir -p /app/logs && chown nodejs:nodejs /app/logs
+
+# Initialize ClamAV virus definitions (run as root before switching user)
+RUN freshclam --quiet || true
 
 # Security: Run as non-root user
 USER nodejs

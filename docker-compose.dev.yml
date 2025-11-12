@@ -68,11 +68,53 @@ services:
     networks:
       - nano-dev-network
 
+  # LocalStack for AWS services emulation (S3, etc.)
+  localstack-dev:
+    image: localstack/localstack:latest
+    container_name: nano-localstack-dev
+    restart: unless-stopped
+    environment:
+      - SERVICES=s3,sqs,sns
+      - DEBUG=1
+      - DATA_DIR=/tmp/localstack/data
+      - DOCKER_HOST=unix:///var/run/docker.sock
+      - AWS_DEFAULT_REGION=us-east-1
+    ports:
+      - "4566:4566"  # LocalStack endpoint
+      - "4571:4571"  # LocalStack dashboard
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock"
+      - localstack_dev_data:/tmp/localstack
+    networks:
+      - nano-dev-network
+
+  # Bull Dashboard for Redis queue monitoring
+  bull-dashboard-dev:
+    image: deadly0/bull-board:latest
+    container_name: nano-bull-dashboard-dev
+    restart: unless-stopped
+    environment:
+      - REDIS_HOST=redis-dev
+      - REDIS_PORT=6379
+      - REDIS_PASSWORD=
+    ports:
+      - "3000:3000"
+    depends_on:
+      redis-dev:
+        condition: service_healthy
+    networks:
+      - nano-dev-network
+
 # Volumes
 volumes:
   postgres_dev_data:
+    driver: local
   redis_dev_data:
+    driver: local
   pgadmin_dev_data:
+    driver: local
+  localstack_dev_data:
+    driver: local
 
 # Networks
 networks:

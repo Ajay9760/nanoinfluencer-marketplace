@@ -4,15 +4,15 @@ const { logger } = require('../utils/monitoring');
 // Database configuration based on environment
 const config = {
   development: {
-    // Use PostgreSQL for development - fallback to SQLite if not available
-    dialect: process.env.DB_DIALECT || 'postgres',
+    // Use SQLite for development - easier setup
+    dialect: process.env.DB_DIALECT || 'sqlite',
     host: process.env.DB_HOST || 'localhost',
     port: process.env.DB_PORT || 5432,
     database: process.env.DB_NAME || 'nanoinfluencer_dev',
     username: process.env.DB_USER || 'postgres',
     password: process.env.DB_PASSWORD || 'password',
-    // SQLite fallback configuration
-    storage: process.env.DB_DIALECT === 'sqlite' ? './database.sqlite' : undefined,
+    // SQLite configuration
+    storage: process.env.DB_STORAGE || './database.sqlite',
     pool: {
       max: 10,
       min: 0,

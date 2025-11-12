@@ -5,10 +5,12 @@
 🚀 **[View Live Website](https://ajay9760.github.io/nanoinfluencer-marketplace)** | 📚 **[Documentation](docs/)** | 🎬 **[Video Demo](https://youtu.be/demo)**
 
 [![Live Website](https://img.shields.io/badge/Live-Website-success)](https://ajay9760.github.io/nanoinfluencer-marketplace)
+[![CI/CD Pipeline](https://github.com/Ajay9760/nanoinfluencer-marketplace/actions/workflows/ci.yml/badge.svg)](https://github.com/Ajay9760/nanoinfluencer-marketplace/actions/workflows/ci.yml)
 [![GitHub Pages](https://github.com/Ajay9760/nanoinfluencer-marketplace/actions/workflows/deploy-pages.yml/badge.svg)](https://github.com/Ajay9760/nanoinfluencer-marketplace/actions/workflows/deploy-pages.yml)
+[![Security Rating](https://img.shields.io/badge/security-A+-brightgreen.svg)](./SECURITY.md)
+[![Test Coverage](https://img.shields.io/badge/coverage-90%2B-brightgreen.svg)](https://codecov.io/gh/Ajay9760/nanoinfluencer-marketplace)
 [![GitHub Stars](https://img.shields.io/github/stars/Ajay9760/nanoinfluencer-marketplace?style=social)](https://github.com/Ajay9760/nanoinfluencer-marketplace)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Security](https://img.shields.io/badge/security-A-green)](https://github.com/Ajay9760/nanoinfluencer-marketplace)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 
 <div align="center">
@@ -29,11 +31,13 @@ A comprehensive **two-sided marketplace** that connects brands (especially SMEs 
 
 ## ✨ **Key Features**
 
-### 👥 **Multi-Role Authentication System**
-- 🔐 **JWT-based authentication** with refresh tokens
+### 👥 **Advanced Authentication & Security**
+- 🔐 **Short-lived Access Tokens** (15min) with automatic refresh
+- 🍪 **HttpOnly Refresh Tokens** in secure cookies with rotation
 - 🛡️ **Two-Factor Authentication (2FA)** with TOTP support
 - 📧 **Email verification** system with beautiful templates
 - 🎭 **Role-based access** (Brands, Influencers, Admins)
+- 🔒 **Token Rotation** for enhanced security
 
 ### 🎯 **Advanced Campaign Management**
 - 📝 **Rich campaign builder** with targeting options
@@ -42,19 +46,27 @@ A comprehensive **two-sided marketplace** that connects brands (especially SMEs 
 - ✅ **Approval workflows** for content review
 - 💰 **Budget management** with escrow protection
 
-### 💳 **Secure Payment Processing**
-- 🔒 **Stripe integration** for secure transactions
-- 🏦 **Escrow system** protecting both parties
-- 💸 **Automated payouts** to influencers
+### 💳 **Secure Payment Processing (Test Mode)**
+- 🔒 **Stripe Test Integration** - NO real money transfers
+- 🏦 **Escrow system** protecting both parties (simulated)
+- 💸 **Automated payouts** to influencers (test mode)
 - 📈 **Commission tracking** and reporting
-- 🌍 **Multi-currency support**
+- 🌍 **Multi-currency support** (test currencies)
+- ⚠️ **Demo Only** - All payments are simulated for testing
 
 ### 📱 **Social Media Integration**
 - 📸 **Instagram API** - Profile verification and analytics
 - 🎵 **TikTok Integration** - Content metrics and insights
 - 🎥 **YouTube Analytics** - Channel statistics
 - 🔄 **Real-time sync** with social platforms
-- 📊 **Engagement metrics** tracking
+- 📆 **Engagement metrics** tracking
+
+### 📁 **Secure File Upload System**
+- ☁️ **Presigned S3 URLs** for direct secure uploads
+- 🛡️ **Virus Scanning** with ClamAV integration
+- 🔍 **File Type Validation** and size limits
+- 🖺 **Quarantine System** for infected files
+- 📦 **Redis Queue** for background processing
 
 ### 🛡️ **Enterprise Security**
 - 🔒 **End-to-end encryption** for sensitive data
@@ -62,6 +74,9 @@ A comprehensive **two-sided marketplace** that connects brands (especially SMEs 
 - 🔍 **Input validation** and sanitization
 - 📝 **GDPR compliance** features
 - 🚨 **Real-time security monitoring**
+- 🔐 **CodeQL Security Scanning** in CI/CD
+- 🍪 **HttpOnly Cookies** for session security
+- 🔄 **Automated dependency updates** with Dependabot
 
 ---
 
@@ -111,14 +126,19 @@ git clone https://github.com/Ajay9760/nanoinfluencer-marketplace.git
 cd nanoinfluencer-marketplace
 ```
 
-### **2. Start Development Environment**
+### **2. Environment Setup**
 ```bash
-# Start Docker services (PostgreSQL, Redis, MailHog)
+# Start Docker services (PostgreSQL, Redis, MailHog, LocalStack)
 docker-compose -f docker-compose.dev.yml up -d
+
+# Copy environment files
+cp backend/.env.example backend/.env
+cp .env.development .env
 
 # Install dependencies
 cd backend && npm install
 cd ../frontend-web && npm install
+cd .. && npm install  # Root dependencies
 ```
 
 ### **3. Launch the Application**
@@ -139,11 +159,22 @@ cd backend && npm run dev
 cd frontend-web && npm start
 ```
 
-### **4. Access Your Application**
-- 🌐 **Frontend**: http://localhost:3000
+### **4. Database Setup**
+```bash
+# Run database migrations
+cd backend && npm run migrate
+
+# Seed with sample data
+npm run seed
+```
+
+### **5. Access Your Application**
+- 🌍 **Frontend**: http://localhost:3000
 - ⚡ **API**: http://localhost:3001/api
-- 🗄️ **Database Admin**: http://localhost:8080
-- 📧 **Email Testing**: http://localhost:8025
+- 🖺 **Database Admin**: http://localhost:8080 (pgAdmin)
+- 📧 **Email Testing**: http://localhost:8025 (MailHog)
+- 📆 **Queue Dashboard**: http://localhost:3000 (Bull Dashboard)
+- ☁️ **LocalStack**: http://localhost:4566 (AWS services)
 
 ---
 
@@ -185,9 +216,14 @@ Once you set up the local environment, you can:
 ## 📚 **Documentation**
 
 ### **Setup Guides**
-- 📖 [**Development Guide**](DEVELOPMENT.md) - Complete local setup
+- 📚 [**Development Guide**](DEVELOPMENT.md) - Complete local setup
 - 🚀 [**Deployment Guide**](DEPLOYMENT.md) - Production deployment
 - 🔑 [**GitHub Setup**](GITHUB-SETUP.md) - Repository configuration
+- 💳 [**Payment Testing Guide**](docs/PAYMENTS_TEST_MODE.md) - Test payment flows
+
+### **Security Documentation**
+- 🛡️ [**Security Policy**](SECURITY.md) - Security practices and reporting
+- 🔒 [**Privacy Policy**](PRIVACY.md) - Data protection and privacy
 
 ### **API Documentation**
 - 🔗 [**REST API Reference**](docs/API.md) - Complete endpoint documentation

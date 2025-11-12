@@ -1,0 +1,416 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, staging, develop ]
+  pull_request:
+    branches: [ main, staging ]
+
+env:
+  NODE_VERSION: '18.x'
+  PYTHON_VERSION: '3.9'
+
+jobs:
+  # Job 1: Code Quality & Security
+  security-and-quality:
+    name: Security & Code Quality
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # Shallow clones should be disabled for better analysis
+
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+        cache-dependency-path: |
+          backend/package-lock.json
+          frontend-web/package-lock.json
+
+    # Security scanning with CodeQL
+    - name: Initialize CodeQL
+      uses: github/codeql-action/init@v3
+      with:
+        languages: javascript
+        queries: security-and-quality
+
+    - name: Install backend dependencies
+      run: |
+        cd backend
+        npm ci
+
+    - name: Install frontend dependencies  
+      run: |
+        cd frontend-web
+        npm ci
+
+    - name: Run ESLint (Backend)
+      run: |
+        cd backend
+        npm run lint
+
+    - name: Run ESLint (Frontend)
+      run: |
+        cd frontend-web
+        npm run lint
+
+    - name: Run Prettier check
+      run: |
+        cd backend && npm run format -- --check
+        cd ../frontend-web && npm run format -- --check
+
+    # Perform CodeQL Analysis
+    - name: Perform CodeQL Analysis
+      uses: github/codeql-action/analyze@v3
+
+    # Dependency vulnerability check
+    - name: Run npm audit (Backend)
+      run: |
+        cd backend
+        npm audit --audit-level moderate
+
+    - name: Run npm audit (Frontend)
+      run: |
+        cd frontend-web
+        npm audit --audit-level moderate
+
+    # OWASP ZAP Baseline security scan (on PR)
+    - name: OWASP ZAP Baseline Scan
+      if: github.event_name == 'pull_request'
+      uses: zaproxy/action-baseline@v0.10.0
+      with:
+        target: 'https://ajay9760.github.io/nanoinfluencer-marketplace'
+
+  # Job 2: Backend Tests
+  backend-tests:
+    name: Backend Tests
+    runs-on: ubuntu-latest
+    needs: security-and-quality
+
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: test_password
+          POSTGRES_USER: test_user
+          POSTGRES_DB: test_db
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+      redis:
+        image: redis:7
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+
+    env:
+      # Test database configuration
+      DB_HOST: localhost
+      DB_PORT: 5432
+      DB_NAME: test_db
+      DB_USER: test_user
+      DB_PASSWORD: test_password
+      
+      # Redis configuration
+      REDIS_URL: redis://localhost:6379
+      
+      # JWT secrets for testing
+      ACCESS_TOKEN_SECRET: test-access-secret-for-ci-pipeline-testing-32-chars
+      REFRESH_TOKEN_SECRET: test-refresh-secret-for-ci-pipeline-testing-32-chars
+      
+      # Other test configurations
+      NODE_ENV: test
+      ENABLE_VIRUS_SCANNER: false
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+        cache-dependency-path: backend/package-lock.json
+
+    - name: Install dependencies
+      run: |
+        cd backend
+        npm ci
+
+    - name: Run database migrations
+      run: |
+        cd backend
+        npm run migrate
+
+    - name: Run unit tests
+      run: |
+        cd backend
+        npm run test
+
+    - name: Run integration tests
+      run: |
+        cd backend
+        npm run test:integration
+
+    - name: Generate test coverage
+      run: |
+        cd backend
+        npm run test:coverage
+
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v4
+      with:
+        file: ./backend/coverage/lcov.info
+        flags: backend
+        name: backend-coverage
+
+  # Job 3: Frontend Tests
+  frontend-tests:
+    name: Frontend Tests
+    runs-on: ubuntu-latest
+    needs: security-and-quality
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+        cache-dependency-path: frontend-web/package-lock.json
+
+    - name: Install dependencies
+      run: |
+        cd frontend-web
+        npm ci
+
+    - name: Run unit tests
+      run: |
+        cd frontend-web
+        npm run test:coverage
+
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v4
+      with:
+        file: ./frontend-web/coverage/lcov.info
+        flags: frontend
+        name: frontend-coverage
+
+    - name: Build frontend
+      run: |
+        cd frontend-web
+        npm run build
+
+    - name: Test frontend build
+      run: |
+        cd frontend-web
+        npm run build
+        # Check if build artifacts exist
+        test -f build/index.html
+        test -d build/static
+
+  # Job 4: E2E Tests
+  e2e-tests:
+    name: End-to-End Tests
+    runs-on: ubuntu-latest
+    needs: [backend-tests, frontend-tests]
+    if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main'
+
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: test_password
+          POSTGRES_USER: test_user
+          POSTGRES_DB: test_db
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+      redis:
+        image: redis:7
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+
+    - name: Install dependencies
+      run: |
+        npm ci
+        cd backend && npm ci
+        cd ../frontend-web && npm ci
+
+    - name: Set up test environment
+      env:
+        DB_HOST: localhost
+        DB_PORT: 5432
+        DB_NAME: test_db
+        DB_USER: test_user
+        DB_PASSWORD: test_password
+        REDIS_URL: redis://localhost:6379
+        ACCESS_TOKEN_SECRET: test-access-secret-for-ci-pipeline-testing-32-chars
+        REFRESH_TOKEN_SECRET: test-refresh-secret-for-ci-pipeline-testing-32-chars
+        NODE_ENV: test
+        ENABLE_VIRUS_SCANNER: false
+      run: |
+        cd backend
+        npm run migrate
+        npm run seed
+
+    - name: Start backend server
+      env:
+        DB_HOST: localhost
+        DB_PORT: 5432
+        DB_NAME: test_db
+        DB_USER: test_user
+        DB_PASSWORD: test_password
+        REDIS_URL: redis://localhost:6379
+        ACCESS_TOKEN_SECRET: test-access-secret-for-ci-pipeline-testing-32-chars
+        REFRESH_TOKEN_SECRET: test-refresh-secret-for-ci-pipeline-testing-32-chars
+        NODE_ENV: test
+        PORT: 3001
+        ENABLE_VIRUS_SCANNER: false
+      run: |
+        cd backend
+        npm start &
+        # Wait for server to start
+        npx wait-on http://localhost:3001/api/health --timeout 30000
+
+    - name: Start frontend server
+      env:
+        REACT_APP_API_URL: http://localhost:3001/api
+      run: |
+        cd frontend-web
+        npm start &
+        # Wait for frontend to start
+        npx wait-on http://localhost:3000 --timeout 30000
+
+    - name: Install Playwright browsers
+      run: npx playwright install --with-deps
+
+    - name: Run Playwright tests
+      run: npx playwright test
+
+    - name: Upload E2E test results
+      uses: actions/upload-artifact@v4
+      if: failure()
+      with:
+        name: playwright-report
+        path: playwright-report/
+        retention-days: 30
+
+  # Job 5: Build and Deploy
+  deploy:
+    name: Deploy
+    runs-on: ubuntu-latest
+    needs: [backend-tests, frontend-tests, e2e-tests]
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/staging'
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+
+    - name: Determine environment
+      run: |
+        if [ "${{ github.ref }}" = "refs/heads/main" ]; then
+          echo "DEPLOY_ENV=production" >> $GITHUB_ENV
+        elif [ "${{ github.ref }}" = "refs/heads/staging" ]; then
+          echo "DEPLOY_ENV=staging" >> $GITHUB_ENV
+        fi
+
+    # Frontend deployment to GitHub Pages (for demo)
+    - name: Install and build frontend
+      run: |
+        cd frontend-web
+        npm ci
+        npm run build
+
+    - name: Deploy to GitHub Pages
+      if: env.DEPLOY_ENV == 'production'
+      uses: peaceiris/actions-gh-pages@v3
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        publish_dir: ./frontend-web/build
+        cname: nanoinfluencer-marketplace.com # Optional: if you have a custom domain
+
+    # Backend deployment (placeholder - implement with your deployment strategy)
+    - name: Deploy backend
+      run: |
+        echo "Deploying backend to ${{ env.DEPLOY_ENV }}"
+        # Add your backend deployment commands here
+        # Examples:
+        # - Deploy to Heroku, AWS, Google Cloud, etc.
+        # - Update Docker images
+        # - Run database migrations on production
+
+    - name: Notify deployment
+      uses: 8398a7/action-slack@v3
+      if: always()
+      with:
+        status: ${{ job.status }}
+        channel: '#deployments'
+        webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}
+        message: |
+          Deployment to ${{ env.DEPLOY_ENV }}: ${{ job.status }}
+          Branch: ${{ github.ref }}
+          Commit: ${{ github.sha }}
+
+  # Job 6: Security Notifications
+  security-notifications:
+    name: Security Notifications
+    runs-on: ubuntu-latest
+    needs: [security-and-quality]
+    if: failure()
+
+    steps:
+    - name: Notify security team
+      uses: 8398a7/action-slack@v3
+      with:
+        status: failure
+        channel: '#security-alerts'
+        webhook_url: ${{ secrets.SECURITY_SLACK_WEBHOOK_URL }}
+        message: |
+          🚨 Security scan failed!
+          Repository: ${{ github.repository }}
+          Branch: ${{ github.ref }}
+          PR: ${{ github.event.pull_request.html_url }}
+          Please review the security findings immediately.

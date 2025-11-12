@@ -143,6 +143,14 @@ User.associate = (models) => {
       as: 'analyticsCreated'
     });
   }
+  
+  // User has many refresh tokens
+  if (models.RefreshToken) {
+    User.hasMany(models.RefreshToken, {
+      foreignKey: 'userId',
+      as: 'refreshTokens'
+    });
+  }
 };
 
 module.exports = User;

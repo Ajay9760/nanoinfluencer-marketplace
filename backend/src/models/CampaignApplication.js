@@ -138,6 +138,18 @@ const CampaignApplication = sequelize.define('CampaignApplication', {
     defaultValue: {},
     field: 'performance_metrics',
     comment: 'Content performance analytics'
+  },
+  
+  // Payment fields
+  paymentStatus: {
+    type: DataTypes.ENUM('pending', 'processing', 'paid', 'failed'),
+    defaultValue: 'pending',
+    field: 'payment_status'
+  },
+  paidAmount: {
+    type: DataTypes.DECIMAL(10, 2),
+    allowNull: true,
+    field: 'paid_amount'
   }
 }, {
   tableName: 'campaign_applications',

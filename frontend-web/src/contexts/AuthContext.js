@@ -16,17 +16,39 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Check if user is already logged in (from localStorage)
-    const savedUser = localStorage.getItem('user');
-    if (savedUser) {
+    // Check if user is already logged in (from localStorage) 
+    // and if access token is still valid or can be refreshed
+    const checkAuthState = async () => {
       try {
-        setUser(JSON.parse(savedUser));
+        const savedUser = localStorage.getItem('user');
+        if (savedUser) {
+          const parsedUser = JSON.parse(savedUser);
+          
+          // Check if we have a valid access token or can refresh it
+          if (apiUtils.isAuthenticated()) {
+            setUser(parsedUser);
+          } else {
+            // Try to refresh token silently
+            try {
+              const response = await authAPI.getProfile();
+              setUser(response.user);
+            } catch (error) {
+              // Refresh failed, clear user data
+              localStorage.removeItem('user');
+              tokenManager.clearTokens();
+            }
+          }
+        }
       } catch (error) {
-        // console.error('Error parsing saved user:', error); // ESLint: no-console
+        console.error('Error checking auth state:', error);
         localStorage.removeItem('user');
+        tokenManager.clearTokens();
+      } finally {
+        setLoading(false);
       }
-    }
-    setLoading(false);
+    };
+    
+    checkAuthState();
   }, []);
 
   const login = async (email, password) => {
@@ -94,7 +116,7 @@ export const AuthProvider = ({ children }) => {
     register,
     logout,
     googleLogin,
-    isAuthenticated: !!user && !!tokenManager.getAccessToken(),
+    isAuthenticated: !!user && apiUtils.isAuthenticated(),
   };
 
   return (

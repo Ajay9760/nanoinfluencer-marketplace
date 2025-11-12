@@ -8,6 +8,9 @@ const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001/api
 const isGitHubPages = window.location.hostname === 'ajay9760.github.io';
 const isDemoMode = isGitHubPages || process.env.REACT_APP_DEMO_MODE === 'true';
 
+// Enhanced demo mode detection
+const isLiveDemo = isGitHubPages || window.location.hostname.includes('github.io');
+
 // Demo data for GitHub Pages
 const demoData = {
   user: {
@@ -64,29 +67,60 @@ const createDemoPromise = (data, delay = 500) => {
 const api = axios.create({
   baseURL: API_BASE_URL,
   timeout: 10000,
+  withCredentials: true, // Include httpOnly cookies in requests
   headers: {
     'Content-Type': 'application/json',
   },
 });
 
-// Token management
-const TOKEN_KEY = 'accessToken';
-const REFRESH_TOKEN_KEY = 'refreshToken';
+// Secure token management - access tokens in memory, refresh tokens in httpOnly cookies
+let accessToken = null;
+let accessTokenExpiry = null;
 
 export const tokenManager = {
-  getAccessToken: () => localStorage.getItem(TOKEN_KEY),
-  getRefreshToken: () => localStorage.getItem(REFRESH_TOKEN_KEY),
-  setTokens: (accessToken, refreshToken) => {
-    localStorage.setItem(TOKEN_KEY, accessToken);
-    if (refreshToken) {
-      localStorage.setItem(REFRESH_TOKEN_KEY, refreshToken);
+  getAccessToken: () => {
+    // Check if token is expired
+    if (accessToken && accessTokenExpiry && new Date() >= accessTokenExpiry) {
+      accessToken = null;
+      accessTokenExpiry = null;
     }
+    return accessToken;
   },
+  
+  setAccessToken: (token, expiresIn = '15m') => {
+    accessToken = token;
+    // Parse expires in (e.g., '15m', '1h', '7d')
+    const duration = parseDuration(expiresIn);
+    accessTokenExpiry = new Date(Date.now() + duration);
+  },
+  
   clearTokens: () => {
-    localStorage.removeItem(TOKEN_KEY);
-    localStorage.removeItem(REFRESH_TOKEN_KEY);
+    accessToken = null;
+    accessTokenExpiry = null;
     localStorage.removeItem('user');
+  },
+  
+  isTokenExpired: () => {
+    return !accessToken || (accessTokenExpiry && new Date() >= accessTokenExpiry);
   }
+};
+
+// Helper function to parse duration strings
+const parseDuration = (duration) => {
+  const units = {
+    's': 1000,
+    'm': 60 * 1000,
+    'h': 60 * 60 * 1000,
+    'd': 24 * 60 * 60 * 1000
+  };
+  
+  const match = duration.match(/^(\d+)([smhd])$/);
+  if (!match) {
+    return 15 * 60 * 1000; // Default to 15 minutes
+  }
+  
+  const [, value, unit] = match;
+  return parseInt(value) * units[unit];
 };
 
 // Request interceptor to add auth token
@@ -113,23 +147,27 @@ api.interceptors.response.use(
       originalRequest._retry = true;
 
       try {
-        const refreshToken = tokenManager.getRefreshToken();
-        if (refreshToken) {
-          const response = await axios.post(`${API_BASE_URL}/auth/refresh`, {
-            refreshToken
-          });
+        // Try to refresh token (refresh token is in httpOnly cookie)
+        const response = await axios.post(`${API_BASE_URL}/auth/refresh`, {}, {
+          withCredentials: true
+        });
 
-          const { accessToken, refreshToken: newRefreshToken } = response.data;
-          tokenManager.setTokens(accessToken, newRefreshToken);
+        const { accessToken, accessTokenExpiresIn } = response.data;
+        tokenManager.setAccessToken(accessToken, accessTokenExpiresIn);
 
-          // Retry the original request
-          originalRequest.headers.Authorization = `Bearer ${accessToken}`;
-          return api(originalRequest);
-        }
+        // Retry the original request
+        originalRequest.headers.Authorization = `Bearer ${accessToken}`;
+        return api(originalRequest);
+        
       } catch (refreshError) {
         // Refresh failed, redirect to login
         tokenManager.clearTokens();
-        window.location.href = '/auth';
+        
+        // Only redirect if not already on auth page
+        if (!window.location.pathname.includes('/auth')) {
+          window.location.href = '/auth';
+        }
+        
         return Promise.reject(refreshError);
       }
     }
@@ -153,13 +191,15 @@ export const authAPI = {
     if (isDemoMode) {
       const user = { ...demoData.user, ...userData, id: 'demo-' + Date.now() };
       localStorage.setItem('user', JSON.stringify(user));
-      return createDemoPromise({ user, accessToken: 'demo-token', refreshToken: 'demo-refresh' });
+      tokenManager.setAccessToken('demo-token', '15m');
+      return createDemoPromise({ user, accessToken: 'demo-token' });
     }
     
     const response = await api.post('/auth/register', userData);
-    const { user, accessToken, refreshToken } = response.data;
+    const { user, accessToken, accessTokenExpiresIn } = response.data;
     
-    tokenManager.setTokens(accessToken, refreshToken);
+    // Store access token in memory and refresh token is in httpOnly cookie
+    tokenManager.setAccessToken(accessToken, accessTokenExpiresIn);
     localStorage.setItem('user', JSON.stringify(user));
     
     return response.data;
@@ -169,21 +209,30 @@ export const authAPI = {
     if (isDemoMode) {
       const user = { ...demoData.user, email: credentials.email };
       localStorage.setItem('user', JSON.stringify(user));
-      return createDemoPromise({ user, accessToken: 'demo-token', refreshToken: 'demo-refresh' });
+      tokenManager.setAccessToken('demo-token', '15m');
+      return createDemoPromise({ user, accessToken: 'demo-token' });
     }
     
     const response = await api.post('/auth/login', credentials);
-    const { user, accessToken, refreshToken } = response.data;
+    const { user, accessToken, accessTokenExpiresIn } = response.data;
     
-    
-    tokenManager.setTokens(accessToken, refreshToken);
+    // Store access token in memory and refresh token is in httpOnly cookie
+    tokenManager.setAccessToken(accessToken, accessTokenExpiresIn);
     localStorage.setItem('user', JSON.stringify(user));
     
     return response.data;
   },
 
   logout: async () => {
-    tokenManager.clearTokens();
+    try {
+      // Call logout endpoint to revoke refresh token
+      await api.post('/auth/logout');
+    } catch (error) {
+      // Continue with logout even if request fails
+      console.warn('Logout request failed:', error);
+    } finally {
+      tokenManager.clearTokens();
+    }
   },
 
   getProfile: async () => {
@@ -208,9 +257,10 @@ export const authAPI = {
 
   googleLogin: async (googleData) => {
     const response = await api.post('/auth/google', googleData);
-    const { user, accessToken, refreshToken } = response.data;
+    const { user, accessToken, accessTokenExpiresIn } = response.data;
     
-    tokenManager.setTokens(accessToken, refreshToken);
+    // Store access token in memory and refresh token is in httpOnly cookie
+    tokenManager.setAccessToken(accessToken, accessTokenExpiresIn);
     localStorage.setItem('user', JSON.stringify(user));
     
     return response.data;
@@ -374,6 +424,121 @@ export const socialMediaAPI = {
   }
 };
 
+// File Upload API
+export const uploadAPI = {
+  // Get upload limits and allowed file types
+  getUploadLimits: async () => {
+    const response = await api.get('/uploads/limits');
+    return response.data;
+  },
+
+  // Validate file before upload
+  validateFile: async (fileName, fileSize, contentType) => {
+    const response = await api.post('/uploads/validate', {
+      fileName,
+      fileSize,
+      contentType
+    });
+    return response.data;
+  },
+
+  // Get presigned upload URL
+  getUploadUrl: async (fileName, fileSize, contentType) => {
+    const response = await api.post('/uploads/sign-upload', {
+      fileName,
+      fileSize,
+      contentType
+    });
+    return response.data;
+  },
+
+  // Upload file to S3 using presigned URL
+  uploadToS3: async (uploadData, file, onProgress) => {
+    const formData = new FormData();
+    
+    // Add all the fields from presigned post
+    Object.keys(uploadData.fields).forEach(key => {
+      formData.append(key, uploadData.fields[key]);
+    });
+    
+    // Add the file last
+    formData.append('file', file);
+    
+    // Upload directly to S3
+    const uploadResponse = await axios.post(uploadData.uploadUrl, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data'
+      },
+      onUploadProgress: (progressEvent) => {
+        if (onProgress) {
+          const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+          onProgress(percentCompleted);
+        }
+      }
+    });
+    
+    return uploadResponse;
+  },
+
+  // Complete upload and trigger virus scan
+  completeUpload: async (key, metadata = {}) => {
+    const response = await api.post('/uploads/complete', {
+      key,
+      metadata
+    });
+    return response.data;
+  },
+
+  // Get file download URL
+  getDownloadUrl: async (key, expiresIn = 3600) => {
+    const response = await api.get(`/uploads/download/${encodeURIComponent(key)}`, {
+      params: { expiresIn }
+    });
+    return response.data;
+  },
+
+  // Delete file
+  deleteFile: async (key) => {
+    const response = await api.delete(`/uploads/${encodeURIComponent(key)}`);
+    return response.data;
+  },
+
+  // List user files
+  listFiles: async (maxKeys = 100) => {
+    const response = await api.get('/uploads', {
+      params: { maxKeys }
+    });
+    return response.data;
+  },
+
+  // Complete file upload flow (validate → get URL → upload → complete)
+  uploadFile: async (file, onProgress) => {
+    try {
+      // Step 1: Validate file
+      await uploadAPI.validateFile(file.name, file.size, file.type);
+      
+      // Step 2: Get presigned upload URL
+      const uploadData = await uploadAPI.getUploadUrl(file.name, file.size, file.type);
+      
+      // Step 3: Upload to S3
+      await uploadAPI.uploadToS3(uploadData.uploadData, file, onProgress);
+      
+      // Step 4: Complete upload and trigger scan
+      const result = await uploadAPI.completeUpload(uploadData.uploadData.key);
+      
+      return {
+        success: true,
+        key: uploadData.uploadData.key,
+        fileName: uploadData.uploadData.fileName,
+        ...result
+      };
+      
+    } catch (error) {
+      throw error;
+    }
+  }
+};
+
 // Generic API utility functions
 export const apiUtils = {
   handleApiError: (error) => {
@@ -391,7 +556,7 @@ export const apiUtils = {
   },
 
   isAuthenticated: () => {
-    return !!tokenManager.getAccessToken();
+    return !!tokenManager.getAccessToken() && !tokenManager.isTokenExpired();
   }
 };
 

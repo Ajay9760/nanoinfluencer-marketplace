@@ -1,0 +1,43 @@
+{
+  "version": 2,
+  "name": "nanoinfluencer-backend",
+  "builds": [
+    {
+      "src": "src/index.js",
+      "use": "@vercel/node",
+      "config": {
+        "maxLambdaSize": "50mb"
+      }
+    }
+  ],
+  "routes": [
+    {
+      "src": "/api/(.*)",
+      "dest": "/src/index.js"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/src/index.js"
+    }
+  ],
+  "env": {
+    "NODE_ENV": "production",
+    "DB_DIALECT": "postgres",
+    "DB_HOST": "@db_host",
+    "DB_PORT": "5432",
+    "DB_NAME": "@db_name", 
+    "DB_USER": "@db_user",
+    "DB_PASSWORD": "@db_password",
+    "JWT_SECRET": "@jwt_secret",
+    "JWT_REFRESH_SECRET": "@jwt_refresh_secret",
+    "SESSION_SECRET": "@session_secret",
+    "CORS_ORIGINS": "https://ajay9760.github.io",
+    "RATE_LIMIT_WINDOW": "900000",
+    "RATE_LIMIT_MAX_REQUESTS": "1000"
+  },
+  "functions": {
+    "src/index.js": {
+      "maxDuration": 30
+    }
+  }
+}

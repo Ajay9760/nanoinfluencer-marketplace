@@ -43,8 +43,8 @@ jobs:
       - name: Build frontend
         working-directory: ./frontend-web
         env:
-          # Use production API URL - you can change this to your backend deployment
-          REACT_APP_API_URL: https://your-backend-api.com/api
+          # Production backend deployed to Vercel
+          REACT_APP_API_URL: https://nanoinfluencer-backend.vercel.app/api
           REACT_APP_APP_NAME: NanoInfluencer Marketplace
           REACT_APP_VERSION: 1.0.0
           PUBLIC_URL: /nanoinfluencer-marketplace
