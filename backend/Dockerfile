@@ -1,5 +1,5 @@
 # Backend Production Dockerfile
-FROM node:18-bullseye AS base
+FROM node:25-bullseye AS base
 
 # Install system dependencies including ClamAV for virus scanning
 RUN apt-get update && apt-get install -y \
