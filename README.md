@@ -2,7 +2,7 @@
 
 > **Connecting brands with authentic nano-influencers for impactful marketing campaigns**
 
-🚀 **[View Live Website](https://ajay9760.github.io/nanoinfluencer-marketplace)** | 📚 **[Documentation](docs/)** | 🎬 **[Video Demo](https://youtu.be/demo)**
+🚀 **[View Live Website](https://ajay9760.github.io/nanoinfluencer-marketplace)** | 📚 **[Documentation](docs/)** 
 
 [![Live Website](https://img.shields.io/badge/Live-Website-success)](https://ajay9760.github.io/nanoinfluencer-marketplace)
 [![CI/CD Pipeline](https://github.com/Ajay9760/nanoinfluencer-marketplace/actions/workflows/ci.yml/badge.svg)](https://github.com/Ajay9760/nanoinfluencer-marketplace/actions/workflows/ci.yml)
