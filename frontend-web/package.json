@@ -14,7 +14,7 @@
     "axios": "^1.12.1",
     "clsx": "^2.0.0",
     "date-fns": "^2.30.0",
-    "framer-motion": "^10.16.16",
+    "framer-motion": "^12.23.25",
     "jwt-decode": "^4.0.0",
     "nodemailer": "7.0.9",
     "postcss": "^8.4.32",
